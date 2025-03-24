@@ -1,17 +1,60 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk melihat detail SSH
-const viewSSHDetails = (vpsHost, username, callback) => {
+// Fungsi untuk melihat daftar member Trojan
+const viewTrojMembers = async (vpsHost) => {
+    return new Promise((resolve, reject) => {
+        // Validasi input
+        if (!vpsHost || typeof vpsHost !== 'string') {
+            reject('Error: VPS host tidak valid.');
+            return;
+        }
+
+        const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^#!" | cut -d " " -f 2-3 | sort | uniq | nl`;
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`Error: ${stderr}`);
+                return;
+            }
+
+            // Format hasil menjadi lebih menarik
+            const formattedOutput = `📋 *DAFTAR MEMBER TROJAN* 📋\n\n` +
+                                    "```\n" +
+                                    stdout +
+                                    "\n```";
+
+            resolve(formattedOutput);
+        });
+    });
+};
+
+// Fungsi untuk memeriksa apakah username ada di /etc/xray/config.json
+const checkUsernameExists = (vpsHost, username, callback) => {
+    const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            // Jika username tidak ditemukan
+            callback(false);
+        } else {
+            // Jika username ditemukan
+            callback(true);
+        }
+    });
+};
+
+// Fungsi untuk melihat detail Trojan
+const viewTrojDetails = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "cat /var/www/html/trojan-${username}.txt"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            callback(`Error: Gagal mengambil detail VME. Pastikan file /var/www/html/trojan-${username}.txt ada di server.`);
+            callback(`Error: Gagal mengambil detail Trojan. Pastikan file /var/www/html/trojan-${username}.txt ada di server.`);
             return;
         }
 
         // Format hasil menjadi lebih menarik
-        const formattedOutput = `🔍 *DETAIL TROJ* 🔍\n\n` +
+        const formattedOutput = `🔍 *DETAIL TROJAN* 🔍\n\n` +
                                "```\n" +
                                stdout +
                                "\n```";
@@ -25,52 +68,74 @@ module.exports = (bot, servers) => {
         const chatId = query.message.chat.id;
         const data = query.data;
 
-        if (data.startsWith('troj_detail_')) {
-            const serverIndex = data.split('_')[2];
-            const server = servers[serverIndex];
+        try {
+            if (data.startsWith('troj_detail_')) {
+                const serverIndex = data.split('_')[2];
+                const server = servers[serverIndex];
 
-            // Validasi server
-            if (!server) {
-                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                return;
-            }
-
-            // Minta input username dari pengguna
-            await bot.sendMessage(chatId, 'Masukkan username Troj:');
-
-            // Tangkap input username
-            bot.once('message', async (msg) => {
-                const username = msg.text;
-
-                // Validasi username
-                if (!username) {
-                    await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
+                // Validasi server
+                if (!server) {
+                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
                     return;
                 }
 
-                // Panggil fungsi viewSSHDetails
-                viewSSHDetails(server.host, username, (error, result) => {
-                    if (error) {
-                        bot.sendMessage(chatId, error);
+                // Tampilkan daftar Trojan terlebih dahulu
+                const listResult = await viewTrojMembers(server.host);
+
+                // Kirim daftar Trojan ke pengguna
+                await bot.sendMessage(chatId, listResult, {
+                    parse_mode: 'Markdown',
+                });
+
+                // Minta input username dari pengguna setelah menampilkan daftar
+                await bot.sendMessage(chatId, 'Masukkan username Trojan untuk melihat detail:');
+
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
+                    const username = msg.text;
+
+                    // Validasi username
+                    if (!username) {
+                        await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
                         return;
                     }
 
-                    // Tambahkan tombol "Kembali ke Pemilihan Server"
-                    const keyboard = {
-                        inline_keyboard: [
-                            [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                            ],
-                        ],
-                    };
+                    // Periksa apakah username ada di /etc/xray/config.json
+                    checkUsernameExists(server.host, username, (exists) => {
+                        if (!exists) {
+                            // Jika username tidak ditemukan
+                            bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada.`);
+                            return;
+                        }
 
-                    // Kirim pesan dengan tombol
-                    bot.sendMessage(chatId, result, {
-                        parse_mode: 'Markdown',
-                        reply_markup: keyboard,
+                        // Jika username ditemukan, lanjutkan mengambil detail
+                        viewTrojDetails(server.host, username, (error, result) => {
+                            if (error) {
+                                bot.sendMessage(chatId, error);
+                                return;
+                            }
+
+                            // Tambahkan tombol "Kembali ke Pemilihan Server"
+                            const keyboard = {
+                                inline_keyboard: [
+                                    [
+                                        { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                                    ],
+                                ],
+                            };
+
+                            // Kirim pesan detail dengan tombol
+                            bot.sendMessage(chatId, result, {
+                                parse_mode: 'Markdown',
+                                reply_markup: keyboard,
+                            });
+                        });
                     });
                 });
-            });
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            await bot.sendMessage(chatId, 'Terjadi kesalahan. Silakan coba lagi.');
         }
     });
 };

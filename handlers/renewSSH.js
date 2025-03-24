@@ -1,11 +1,35 @@
 const { exec } = require('child_process');
 
+// Fungsi untuk melihat member SSH
+const viewSSHMembers = (vpsHost, callback) => {
+    const command = `ssh root@${vpsHost} bot-member-ssh`;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            callback(`Error: ${stderr}`);
+            return;
+        }
+
+        // Format hasil menjadi lebih menarik
+        const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
+                                "```\n" +
+                                stdout +
+                                "\n```";
+
+        callback(null, formattedOutput);
+    });
+};
+
 // Fungsi untuk renew SSH di VPS
 const renewSSH = (vpsHost, username, exp, callback) => {
     const command = `printf "${username}\n${exp}" | ssh root@${vpsHost} renewssh`;
 
     exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
+        if (error) {
+            callback(`❌ Gagal renew user \`${username}\`. Error: ${stderr}`);
+            return;
+        }
+
         callback(`✅ User \`${username}\` berhasil direnew \`${exp}\` Hari.`);
     });
 };
@@ -15,7 +39,39 @@ module.exports = (bot, servers) => {
         const chatId = query.message.chat.id;
         const data = query.data;
 
-        if (data.startsWith('renew_ssh_')) {
+        if (data.startsWith('list_member_')) {
+            const serverIndex = data.split('_')[2];
+            const server = servers[serverIndex];
+
+            if (!server) {
+                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                return;
+            }
+
+            // Panggil fungsi viewSSHMembers
+            viewSSHMembers(server.host, (error, result) => {
+                if (error) {
+                    bot.sendMessage(chatId, error);
+                    return;
+                }
+
+                // Tambahkan tombol "Renew SSH" dan "Kembali ke Pemilihan Server"
+                const keyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🔄 Renew SSH', callback_data: `renew_ssh_${serverIndex}` },
+                            { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                        ],
+                    ],
+                };
+
+                // Kirim pesan dengan tombol
+                bot.sendMessage(chatId, result, {
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard,
+                });
+            });
+        } else if (data.startsWith('renew_ssh_')) {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
 

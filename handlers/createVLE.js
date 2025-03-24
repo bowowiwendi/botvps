@@ -1,6 +1,73 @@
 const { Client } = require('ssh2');
 const fs = require('fs');
 
+// Fungsi untuk membaca file /etc/xray/config.json dan memeriksa username
+const checkUsernameExists = async (vpsHost, username, privateKeyPath) => {
+    const conn = new Client();
+
+    // Baca file private key dari path
+    let privateKey;
+    try {
+        privateKey = fs.readFileSync(privateKeyPath, 'utf8'); // Baca file private key
+    } catch (error) {
+        console.error('Error reading private key file:', error.message);
+        throw new Error('❌ Gagal membaca file private key.');
+    }
+
+    // Konfigurasi SSH
+    const sshConfig = {
+        host: vpsHost, // Host server
+        port: 22, // Port SSH (default: 22)
+        username: 'root', // Username SSH
+        privateKey: privateKey, // Private key yang dibaca dari file
+    };
+
+    // Perintah untuk membaca file /etc/xray/config.json
+    const command = `cat /etc/xray/config.json | grep '"${username}"'`;
+
+    return new Promise((resolve, reject) => {
+        conn.on('ready', () => {
+            console.log('SSH connection established');
+            // Jalankan perintah di server
+            conn.exec(command, (err, stream) => {
+                if (err) {
+                    console.error('Error executing command:', err.message);
+                    conn.end();
+                    return reject('❌ Gagal menjalankan perintah di server.');
+                }
+
+                let data = '';
+                stream.on('data', (chunk) => {
+                    data += chunk;
+                });
+
+                stream.on('close', (code) => {
+                    console.log('Command executed with code:', code);
+                    console.log('Output:', data);
+
+                    // Tutup koneksi SSH
+                    conn.end();
+
+                    // Periksa apakah username ditemukan
+                    if (data.includes(username)) {
+                        resolve(true); // Username sudah ada
+                    } else {
+                        resolve(false); // Username belum ada
+                    }
+                });
+            });
+        });
+
+        conn.on('error', (err) => {
+            console.error('SSH connection error:', err.message);
+            reject('❌ Gagal terhubung ke server.');
+        });
+
+        // Hubungkan ke server
+        conn.connect(sshConfig);
+    });
+};
+
 // Fungsi untuk membuat VLESS
 const createVless = async (vpsHost, username, quota, ipLimit, activePeriod, domain, privateKeyPath) => {
     const conn = new Client();
@@ -118,10 +185,10 @@ module.exports = (bot, servers) => {
             const serverIndex = data.split('_')[2]; // Ambil serverIndex dari callback data
             const server = servers[serverIndex]; // Ambil server berdasarkan serverIndex
 
-            if (!server) {
-                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                return;
-            }
+            // if (!server) {
+            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+            //     return;
+            // }
 
             const domain = server.domain; // Ambil domain dari server
             const privateKeyPath = server.privateKey; // Ambil path ke private key dari server
@@ -144,6 +211,14 @@ module.exports = (bot, servers) => {
                 }
 
                 try {
+                    // Periksa apakah username sudah ada
+                    const usernameExists = await checkUsernameExists(server.host, username, privateKeyPath);
+
+                    if (usernameExists) {
+                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada. Silakan gunakan username lain.`);
+                        return;
+                    }
+
                     // Panggil fungsi createVless
                     const vlessData = await createVless(server.host, username, quota, ipLimit, activePeriod, domain, privateKeyPath);
 

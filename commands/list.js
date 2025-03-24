@@ -58,6 +58,9 @@ module.exports = (bot, servers) => {
                         { text: ' V2RAY', callback_data: `v2ray_${serverIndex}` },
                     ],
                     [
+                        { text: 'Setting', callback_data: `Setting_${serverIndex}` },
+                    ],
+                    [
                         { text: '🔙 Kembali', callback_data: 'list_servers' },
                     ],
                 ],
@@ -93,7 +96,7 @@ by @WENDIVPN
                     ],
                     [
                         { text: 'Delete SSH', callback_data: `delete_ssh_${serverIndex}` },
-                        { text: 'List Member', callback_data: `list_member_${serverIndex}` },
+                        { text: 'List SSH', callback_data: `list_member_${serverIndex}` },
                     ],
                     [
                         { text: 'Renew SSH', callback_data: `renew_ssh_${serverIndex}` },
@@ -108,6 +111,7 @@ by @WENDIVPN
                     ],
                 ],
             };
+            
             const message = `
 📋 Keterangan Server yang Dipilih:
 - Nama: ${server.name}
@@ -125,3 +129,6 @@ by @WENDIVPN
         }
     });
 };
+
+
+   

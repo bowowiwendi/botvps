@@ -1,25 +1,99 @@
-const { exec } = require('child_process');
+const { Client } = require('ssh2');
+const fs = require('fs');
 
-// Fungsi untuk membuat SSH di VPS
-const createSSH = (vpsHost, username, password, limitDevice, activePeriod, callback) => {
-    const command = `printf "${username}\n${password}\n${limitDevice}\n${activePeriod}" | ssh root@${vpsHost} createssh`;
+// Fungsi untuk memeriksa apakah username ada di /etc/shadow
+const checkUserInShadow = (conn, username, callback) => {
+    conn.exec(`grep '^${username}:' /etc/shadow`, (err, stream) => {
+        if (err) {
+            return callback(err);
+        }
 
-    exec(command, (error, stdout, stderr) => {
-        // Data SSH yang dihasilkan
-        const sshData = {
-            username: username,
-            password: password,
-            domain: domain, // Ganti dengan domain yang sesuai
-            expired: `${activePeriod} hari`, // Masa aktif SSH
-            ip_limit: limitDevice, // Batasan IP
-        };
+        let stdout = '';
+        stream.on('data', (data) => {
+            stdout += data.toString();
+        }).on('close', (code, signal) => {
+            if (stdout.trim()) {
+                // Jika username ditemukan
+                callback(null, true);
+            } else {
+                // Jika username tidak ditemukan
+                callback(null, false);
+            }
+        });
+    });
+};
 
-        // Hasilkan pesan dengan format yang diinginkan
-        const message = `🌟 *AKUN SSH PREMIUM* 🌟\n\n` +
-                        `🔹 *Informasi Akun*\n` +
-                        generateSSHMessage(sshData);
+// Fungsi untuk membuat SSH di VPS menggunakan ssh2
+const createSSH = (vpsHost, username, password, limitDevice, activePeriod, privateKeyPath, callback) => {
+    const conn = new Client();
 
-        callback(null, message);
+    let privateKey;
+    try {
+        privateKey = fs.readFileSync(privateKeyPath, 'utf8'); // Baca file private key
+    } catch (error) {
+        console.error('Error reading private key file:', error.message);
+        return callback(new Error('❌ Gagal membaca file private key.'));
+    }
+
+    conn.on('ready', () => {
+        // Cek apakah username sudah ada di /etc/shadow
+        checkUserInShadow(conn, username, (err, exists) => {
+            if (err) {
+                conn.end();
+                return callback(new Error('❌ Gagal memeriksa username di /etc/shadow.'));
+            }
+
+            if (exists) {
+                conn.end();
+                return callback(new Error(`❌ Username \`${username}\` sudah ada. Silakan gunakan username lain.`));
+            }
+
+            // Jika username belum ada, lanjutkan pembuatan SSH
+            conn.exec(`createssh ${username} ${password} ${limitDevice} ${activePeriod}`, (err, stream) => {
+                if (err) {
+                    conn.end();
+                    return callback(err);
+                }
+
+                let stdout = '';
+                stream.on('data', (data) => {
+                    stdout += data.toString();
+                }).on('close', (code, signal) => {
+                    conn.end();
+
+                    try {
+                        // Parse output JSON
+                        const output = JSON.parse(stdout);
+
+                        // Ambil domain dari output JSON
+                        const domain = output.domain;
+
+                        // Data SSH yang dihasilkan
+                        const sshData = {
+                            username: username,
+                            password: password,
+                            domain: domain, // Domain diambil dari output JSON
+                            expired: `${activePeriod} hari`,
+                            ip_limit: limitDevice,
+                        };
+
+                        // Hasilkan pesan dengan format yang diinginkan
+                        const message = `🌟 *AKUN SSH PREMIUM* 🌟\n\n` +
+                                        `🔹 *Informasi Akun*\n` +
+                                        generateSSHMessage(sshData);
+
+                        callback(null, message);
+                    } catch (parseError) {
+                        callback(parseError);
+                    }
+                });
+            });
+        });
+    }).connect({
+        host: vpsHost,
+        port: 22,
+        username: 'root',
+        privateKey: privateKey, // Gunakan privateKey sebagai kunci SSH
     });
 };
 
@@ -76,9 +150,11 @@ module.exports = (bot, servers) => {
                 return;
             }
 
+            const privateKeyPath = server.privateKey;
+
             // Minta input dari pengguna
             await bot.sendMessage(chatId, 'Masukkan detail SSH (format: username password limit_device masa_aktif):');
-              
+
             // Tangkap input pengguna
             bot.once('message', async (msg) => {
                 const input = msg.text.split(' ');
@@ -88,10 +164,13 @@ module.exports = (bot, servers) => {
                     await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
                     return;
                 }
-               
-                const domain = server.domain;
+
                 // Panggil fungsi createSSH
-                createSSH(server.host, username, password, limitDevice, activePeriod, domain, (error, result) => {
+                createSSH(server.host, username, password, limitDevice, activePeriod, privateKeyPath, (error, result) => {
+                    if (error) {
+                        return bot.sendMessage(chatId, error.message);
+                    }
+
                     // Tambahkan tombol "Kembali ke Pemilihan Server"
                     const keyboard = {
                         inline_keyboard: [

@@ -45,9 +45,13 @@ const delTroj = require('./handlers/delTroj');
 const delVME = require('./handlers/delVME');
 const delVLE = require('./handlers/delVLE');
 const delSS = require('./handlers/delSS');
+const hadleSetting = require('./commands/hadleSetting');
+const info = require('./commands/info');
 const broadcast = require('./broadcast');// Import modul broadcast
+
+// Import modul broadcast
 // Konfigurasi bot
-const token = process.env.TELEGRAM_BOT_TOKEN || '7234554871:AAFPriXZujU6E3LWc37K3raePM0fxhXxX40'; // Gunakan environment variable
+const token = process.env.TELEGRAM_BOT_TOKEN ||'7389923076:AAFWqHuWmCgeGs97TtNOj77AE4ahQpZeIz0'; // Gunakan environment variable
 const bot = new TelegramBot(token, { polling: true });
 
 // Baca file konfigurasi server
@@ -120,9 +124,20 @@ const commands = [
     { command: delTroj, params: [bot, servers] },
     { command: delVME, params: [bot, servers] },
     { command: delVLE, params: [bot, servers] },
+   { command: hadleSetting, params: [bot, servers] },
+    { command: info, params: [bot, servers] },
 ];
-
-commands.forEach(cmd => cmd.command(...cmd.params));
+commands.forEach(cmd => {
+    try {
+        if (typeof cmd.command === 'function') {
+            cmd.command(...cmd.params); // Spread operator untuk mengurai array params
+        } else {
+            throw new Error(`Invalid command: ${cmd.command} is not a function`);
+        }
+    } catch (error) {
+        console.error(`Error executing command:`, error);
+    }
+});
 
 // Import dan inisialisasi perintah admin
 // require('./commands/addadmin')(bot, userState);
