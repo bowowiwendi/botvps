@@ -4,10 +4,14 @@ const showIPSubmenu = (chatId, serverIndex) => {
             inline_keyboard: [
                 [
                     { text: '➕ Regist IP', callback_data: `register_ip_${serverIndex}` },
+                ],
+                [
                     { text: '🔄 Renew IP', callback_data: `renew_ip_${serverIndex}` }
                 ],
                 [
                     { text: '🗑 Delete IP', callback_data: `delete_ip_${serverIndex}` },
+                ],
+                [
                     { text: '📋 List IP', callback_data: `list_ip_${serverIndex}` }
                 ],
                 [

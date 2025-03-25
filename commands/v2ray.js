@@ -5,18 +5,26 @@ module.exports = (bot, servers) => {
             inline_keyboard: [
                 [
                     { text: 'Create', callback_data: `${prefix}_create_${serverIndex}` },
+                ],
+                [
                     { text: 'Trial', callback_data: `${prefix}_trial_${serverIndex}` },
                 ],
                 [
                     { text: 'Delete', callback_data: `${prefix}_delete_${serverIndex}` },
+                ],
+                [
                     { text: 'List', callback_data: `${prefix}_list_${serverIndex}` },
                 ],
                 [
                     { text: 'Renew', callback_data: `${prefix}_renew_${serverIndex}` },
+                ],
+                [
                     { text: 'Detail', callback_data: `${prefix}_detail_${serverIndex}` },
                 ],
                 [
                     { text: 'Unlock', callback_data: `${prefix}_unlock_${serverIndex}` },
+                ],
+                [
                     { text: 'Lock', callback_data: `${prefix}_lock_${serverIndex}` },
                 ],
                 [
@@ -104,11 +112,18 @@ by @WENDIVPN
                     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
                     return;
                 }
-
+                
+const serverDescription = `
+📋 Keterangan Server yang Dipilih:
+- Nama: ${server.name}
+- Host: ${server.host}
+- Protokol : ${prefix.toUpperCase()}
+by @WENDIVPN
+                `;
                 // Tampilkan submenu sesuai prefix
                 const subMenu = createSubMenu(prefix, serverIndex);
 
-                await bot.sendMessage(chatId, `Anda memilih ${prefix.toUpperCase()} untuk server ${server.name}`, {
+                await bot.sendMessage(chatId, serverDescription, {
                     reply_markup: subMenu,
                 });
             }

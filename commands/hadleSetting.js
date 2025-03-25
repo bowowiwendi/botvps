@@ -21,10 +21,14 @@ module.exports = (bot, servers) => {
       inline_keyboard: [
         [
           { text: 'Reboot', callback_data: `reboot_${serverIndex}` },
+        ],
+        [
           { text: 'Regist', callback_data: `regist_${serverIndex}` },
         ],
         [
           { text: 'Gen Link', callback_data: `gen_link_${serverIndex}` },
+        ],
+        [
           { text: 'Info VPS', callback_data: `info_vps_${serverIndex}` },
         ],
         [

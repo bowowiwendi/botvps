@@ -10,18 +10,21 @@ Daftar Menu Admin:
 Format: /addadmin <ID>
 Contoh: /addadmin 123456789
 2. /deladmin - Hapus admin.
-Pilih admin yang ingin dihapus dari daftar.
 3. /listadmin - Lihat daftar admin.
-4. /detailadmin - Lihat detail admin yang sedang aktif.`;
+4. /detailadmin - Lihat detail admin.`;
 
         const keyboard = {
             inline_keyboard: [
                 [
                     { text: 'Tambah Admin', callback_data: 'addadmin' },
+                ],
+                [
                     { text: 'Hapus Admin', callback_data: 'deladmin' },
                 ],
                 [
                     { text: 'Daftar Admin', callback_data: 'listadmin' },
+                ],
+                [
                     { text: 'Detail Admin', callback_data: 'detailadmin' },
                 ],
                 [

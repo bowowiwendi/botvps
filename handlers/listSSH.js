@@ -6,15 +6,15 @@ const viewSSHMembers = (vpsHost, callback) => {
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            callback(`Error: ${stderr}`);
+            callback(`❌ Gagal mengambil daftar member SSH. Error: ${stderr}`);
             return;
         }
 
         // Format hasil menjadi lebih menarik
         const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
+                              "```\n" +
+                              stdout.trim() +  // trim() untuk menghapus whitespace berlebih
+                              "\n```";
 
         callback(null, formattedOutput);
     });
@@ -30,28 +30,26 @@ module.exports = (bot, servers) => {
             const server = servers[serverIndex];
 
             if (!server) {
-                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
                 return;
             }
 
             // Panggil fungsi viewSSHMembers
-            viewSSHMembers(server.host, (error, result) => {
-                if (error) {
-                    bot.sendMessage(chatId, error);
-                    return;
-                }
-
+            viewSSHMembers(server.host, async (error, result) => {
                 // Tambahkan tombol "Kembali ke Pemilihan Server"
                 const keyboard = {
                     inline_keyboard: [
                         [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                            { 
+                                text: '🔙 Kembali', 
+                                callback_data: `select_server_${serverIndex}` 
+                            },
                         ],
                     ],
                 };
 
                 // Kirim pesan dengan tombol
-                bot.sendMessage(chatId, result, {
+                await bot.sendMessage(chatId, result, {
                     parse_mode: 'Markdown',
                     reply_markup: keyboard,
                 });

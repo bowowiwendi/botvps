@@ -1,31 +1,29 @@
 const { exec } = require('child_process');
 
-const viewSSHMembers = (vpsHost, callback) => {
-    const command = `ssh root@${vpsHost} bot-member-ssh`;
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`Error: ${stderr}`);
-            return;
-        }
-
-        // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
-
-        callback(null, formattedOutput);
+// Fungsi untuk mengecek keberadaan user di /etc/shadow
+const checkUserExists = (vpsHost, username, callback) => {
+    const checkCommand = `ssh root@${vpsHost} "grep -q '^${username}:' /etc/shadow && echo 'exists' || echo 'not_exists'"`;
+    
+    exec(checkCommand, (error, stdout, stderr) => {
+        callback(!error && stdout.trim() === 'exists');
     });
 };
 
-// Fungsi untuk menghapus SSH di VPS
+// Fungsi untuk mengunci SSH di VPS
 const lockSSH = (vpsHost, username, callback) => {
-    const command = `printf "${username}" | ssh root@${vpsHost} user-lock.sh`;
+    checkUserExists(vpsHost, username, (exists) => {
+        if (!exists) {
+            callback(`❌ User \`${username}\` tidak ditemukan.`);
+            return;
+        }
 
-    exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
-        callback(`✅ User \`${username}\` berhasil dikunci.`);
+        const command = `printf "${username}" | ssh root@${vpsHost} user-lock.sh`;
+        exec(command, (error, stdout, stderr) => {
+            callback(error 
+                ? `⚠️ Gagal mengunci user \`${username}\``
+                : `✅ User \`${username}\` berhasil dikunci.`
+            );
+        });
     });
 };
 
@@ -39,48 +37,30 @@ module.exports = (bot, servers) => {
             const server = servers[serverIndex];
 
             if (!server) {
-                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                await bot.sendMessage(chatId, '🚫 Server tidak ditemukan');
                 return;
             }
+          
+            await bot.sendMessage(chatId, '🔒 Masukkan username SSH yang ingin dikunci:');
             
-            // Kirim daftar member SSH terlebih dahulu
-            viewSSHMembers(server.host, async (error, result) => {
-                if (error) {
-                    await bot.sendMessage(chatId, error);
+            bot.once('message', async (msg) => {
+                const username = msg.text.trim();
+                if (!username) {
+                    await bot.sendMessage(chatId, '⚠️ Username tidak boleh kosong');
                     return;
                 }
 
-                // Kirim daftar member
-                await bot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
-
-                // Minta input username dari pengguna
-                await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dikunci:');
-
-                // Tangkap input pengguna
-                bot.once('message', async (msg) => {
-                    const username = msg.text;
-
-                    if (!username) {
-                        await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
-                        return;
-                    }
-
-                    // Panggil fungsi lockSSH
-                    lockSSH(server.host, username, async (result) => {
-                        // Tambahkan tombol "Kembali ke Menu Server"
-                        const keyboard = {
-                            inline_keyboard: [
-                                [
-                                    { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                ],
-                            ],
-                        };
-
-                        // Kirim pesan hasil penguncian dengan tombol
-                        await bot.sendMessage(chatId, result, {
-                            parse_mode: 'Markdown',
-                            reply_markup: keyboard,
-                        });
+                lockSSH(server.host, username, async (result) => {
+                    await bot.sendMessage(chatId, result, {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [[
+                                { 
+                                    text: '🔙 Kembali', 
+                                    callback_data: `select_server_${serverIndex}` 
+                                }
+                            ]]
+                        }
                     });
                 });
             });

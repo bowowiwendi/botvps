@@ -92,18 +92,26 @@ by @WENDIVPN
                 inline_keyboard: [
                     [
                         { text: 'Create SSH', callback_data: `create_ssh_${serverIndex}` },
+                    ],
+                    [
                         { text: 'Trial SSH', callback_data: `trial_ssh_${serverIndex}` },
                     ],
                     [
                         { text: 'Delete SSH', callback_data: `delete_ssh_${serverIndex}` },
+                    ],
+                    [
                         { text: 'List SSH', callback_data: `list_member_${serverIndex}` },
                     ],
                     [
                         { text: 'Renew SSH', callback_data: `renew_ssh_${serverIndex}` },
+                    ],
+                    [
                         { text: 'Detail SSH', callback_data: `detail_ssh_${serverIndex}` },
                     ],
                     [
                         { text: 'Lock SSH', callback_data: `lock_ssh_${serverIndex}` },
+                    ],
+                    [
                         { text: 'Unlock SSH', callback_data: `unlock_ssh_${serverIndex}` },
                     ],              
                     [

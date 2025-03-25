@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
+require('dotenv').config();
 
 // Import commands and handlers
 const startCommand = require('./commands/start');

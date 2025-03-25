@@ -1,27 +1,5 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk melihat daftar member SSH
-const viewSSHMembers = async (vpsHost) => {
-    return new Promise((resolve, reject) => {
-        const command = `ssh root@${vpsHost} bot-member-ssh`;
-
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                reject(`Error: ${stderr}`);
-                return;
-            }
-
-            // Format hasil menjadi lebih menarik
-            const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
-                                    "```\n" +
-                                    stdout +
-                                    "\n```";
-
-            resolve(formattedOutput);
-        });
-    });
-};
-
 // Fungsi untuk memeriksa apakah username ada di /etc/shadow
 const checkUsernameInShadow = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "grep '^${username}:' /etc/shadow"`;
@@ -63,14 +41,6 @@ module.exports = (bot, servers) => {
                     return;
                 }
 
-                // Tampilkan daftar SSH terlebih dahulu
-                const listResult = await viewSSHMembers(server.host);
-
-                // Kirim daftar SSH ke pengguna
-                await bot.sendMessage(chatId, listResult, {
-                    parse_mode: 'Markdown',
-                });
-
                 // Minta input username dari pengguna setelah menampilkan daftar
                 await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dihapus:');
 
@@ -88,7 +58,7 @@ module.exports = (bot, servers) => {
                     checkUsernameInShadow(server.host, username, (exists) => {
                         if (!exists) {
                             // Jika username tidak ditemukan
-                            bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada di /etc/shadow.`);
+                            bot.sendMessage(chatId, `❌ User \`${username}\` tidak di ada.`);
                             return;
                         }
 
