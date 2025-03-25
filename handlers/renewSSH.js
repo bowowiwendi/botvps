@@ -59,7 +59,6 @@ module.exports = (bot, servers) => {
                 const keyboard = {
                     inline_keyboard: [
                         [
-                            { text: '🔄 Renew SSH', callback_data: `renew_ssh_${serverIndex}` },
                             { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
                         ],
                     ],

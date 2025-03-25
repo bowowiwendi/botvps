@@ -2,7 +2,7 @@ const { exec } = require('child_process');
 
 // Fungsi untuk mendapatkan daftar akun yang terkunci dari /etc/xray/.lock.db
 const getLockedAccounts = (vpsHost, callback) => {
-    const command = `ssh root@${vpsHost} "cat /etc/xray/.lock.db"`;
+    const command = `ssh root@${vpsHost} "cat /etc/xray/.lock.db | grep "^#!!" | cut -d " " -f 2-3 | sort | uniq | nl"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {

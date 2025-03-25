@@ -1,5 +1,30 @@
 const { exec } = require('child_process');
 
+const viewVMEMembers = (vpsHost, callback) => {
+    // Validasi input
+    if (!vpsHost || typeof vpsHost !== 'string') {
+        callback('Error: VPS host tidak valid.');
+        return;
+    }
+
+    const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl`;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            callback(`Error: ${stderr}`);
+            return;
+        }
+
+        // Format hasil menjadi lebih menarik
+        const formattedOutput = `📋 *DAFTAR MEMBER VME* 📋\n\n` +
+                                "```\n" +
+                                stdout +
+                                "\n```";
+
+        callback(null, formattedOutput);
+    });
+};
+
 // Fungsi untuk memeriksa apakah username ada di /etc/xray/config.json
 const checkUsernameExists = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
@@ -38,6 +63,7 @@ module.exports = (bot, servers) => {
             //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
             //     return;
             // }
+          const listResult = await viewVMEMembers(server.host);
 
             // Minta input username dari pengguna
             await bot.sendMessage(chatId, 'Masukkan username VMESS yang ingin dikunci:');

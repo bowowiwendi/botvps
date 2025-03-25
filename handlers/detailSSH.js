@@ -1,5 +1,24 @@
 const { exec } = require('child_process');
 
+const viewSSHMembers = (vpsHost, callback) => {
+    const command = `ssh root@${vpsHost} bot-member-ssh`;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            callback(`Error: ${stderr}`);
+            return;
+        }
+
+        // Format hasil menjadi lebih menarik
+        const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
+                                "```\n" +
+                                stdout +
+                                "\n```";
+
+        callback(null, formattedOutput);
+    });
+};
+
 // Fungsi untuk melihat member SSH
 const viewSSHMembers = (vpsHost, callback) => {
     const command = `ssh root@${vpsHost} bot-member-ssh`;

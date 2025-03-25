@@ -23,6 +23,13 @@ module.exports = (bot, servers) => {
                 await bot.sendMessage(chatId, 'Server tidak ditemukan.');
                 return;
             }
+            
+            viewSSHMembers(server.host, (error, result) => {
+                if (error) {
+                    bot.sendMessage(chatId, error);
+                    return;
+                }
+
 
             // Minta input username dari pengguna
             await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dibuka:');
