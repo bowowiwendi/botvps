@@ -1,43 +1,36 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk mendapatkan daftar akun yang terkunci dari /etc/xray/.lock.db
+// Fungsi untuk mendapatkan daftar akun yang terkunci
 const getLockedAccounts = (vpsHost, callback) => {
-    const command = `ssh root@${vpsHost} "cat /etc/xray/.lock.db | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl"`;
-
+    const command = `ssh root@${vpsHost} "cat /etc/xray/.lock.db 2>/dev/null | grep '^###' | cut -d ' ' -f 2-3 | sort | uniq | nl"`;
+    
     exec(command, (error, stdout, stderr) => {
-        if (error) {
-            // Jika file tidak ditemukan atau error
+        if (error || !stdout.trim()) {
             callback([]);
         } else {
-            // Ambil daftar username yang terkunci
-            const lockedAccounts = stdout.split('\n').filter(Boolean);
-            callback(lockedAccounts);
+            callback(stdout.trim().split('\n'));
         }
     });
 };
 
-// Fungsi untuk memeriksa apakah username ada di /etc/xray/.lock.db
+// Fungsi untuk memeriksa apakah username terkunci
 const checkUserLocked = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/.lock.db"`;
-
+    const command = `ssh root@${vpsHost} "grep -w '${username}' /etc/xray/.lock.db 2>/dev/null"`;
+    
+    exec(command, (error, stdout) => {
+        callback(!error && stdout.trim() !== '');
+    });
+};
+// Fungsi untuk membuka kunci akun
+const unlockVME = (vpsHost, username, callback) => {
+    const command = `ssh root@${vpsHost} "unlock-vm '${username}'"`;
+    
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            // Jika username tidak ditemukan
-            callback(false);
+            callback(`❌ Gagal membuka kunci: ${stderr}`);
         } else {
-            // Jika username ditemukan
-            callback(true);
+            callback(`✅ Berhasil membuka kunci \`${username}\``);
         }
-    });
-};
-
-// Fungsi untuk membuka kunci akun VME di VPS
-const unlockVME = (vpsHost, username, callback) => {
-    const command = `printf "${username}" | ssh root@${vpsHost} unlock-vm`;
-
-    exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
-        callback(`✅ User \`${username}\` berhasil dibuka.`);
     });
 };
 
@@ -45,74 +38,79 @@ module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const data = query.data;
+        const serverIndex = data.split('_')[2];
+        const server = servers[serverIndex];
+
+        if (!server) {
+            await bot.sendMessage(chatId, '❌ Server tidak ditemukan', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔙 Kembali', callback_data: 'main_menu' }]
+                    ]
+                }
+            });
+            return;
+        }
 
         if (data.startsWith('vme_unlock_')) {
-            const serverIndex = data.split('_')[2];
-            const server = servers[serverIndex];
+            getLockedAccounts(server.host, async (accounts) => {
+                const backButton = {
+                    inline_keyboard: [
+                        [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+                    ]
+                };
 
-            // if (!server) {
-            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-            //     return;
-            // }
-
-            // Tampilkan daftar akun yang terkunci
-            getLockedAccounts(server.host, (lockedAccounts) => {
-                if (lockedAccounts.length === 0) {
-                    bot.sendMessage(chatId, 'Tidak ada akun yang terkunci.');
+                if (accounts.length === 0) {
+                    await bot.sendMessage(chatId, '🔓 Tidak ada akun yang terkunci', {
+                        reply_markup: backButton
+                    });
                     return;
                 }
 
-                // Format daftar akun yang terkunci
-                const lockedAccountsMessage = `
-🔒 *Daftar Akun yang Terkunci:*
-\`\`\`
-${lockedAccounts.join('\n')}
-\`\`\`
-                `;
+                await bot.sendMessage(chatId, 
+                    `🔒 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\`\nMasukkan username:`, 
+                    { parse_mode: 'Markdown' }
+                );
 
-                // Kirim daftar akun yang terkunci
-                bot.sendMessage(chatId, lockedAccountsMessage, {
-                    parse_mode: 'Markdown',
-                });
-
-                // Minta input username dari pengguna
-                bot.sendMessage(chatId, 'Masukkan username VME yang ingin dibuka:');
-
-                // Tangkap input pengguna
-                bot.once('message', async (msg) => {
-                    const username = msg.text;
-
+                const listenerId = `unlock_${chatId}_${Date.now()}`;
+                
+                bot.once(listenerId, async (msg) => {
+                    if (msg.chat.id !== chatId) return;
+                    
+                    const username = msg.text.trim();
+                    
                     if (!username) {
-                        await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
+                            reply_markup: backButton
+                        });
                         return;
                     }
 
-                    // Periksa apakah username ada di /etc/xray/.lock.db
-                    checkUserLocked(server.host, username, (isLocked) => {
+                    checkUserLocked(server.host, username, async (isLocked) => {
                         if (!isLocked) {
-                            // Jika username tidak ditemukan di file .lock.db
-                            bot.sendMessage(chatId, `❌ User \`${username}\` tidak terkunci.`);
+                            await bot.sendMessage(chatId, 
+                                `❌ User \`${username}\` tidak terkunci`, 
+                                { 
+                                    parse_mode: 'Markdown',
+                                    reply_markup: backButton 
+                                }
+                            );
                             return;
                         }
 
-                        // Jika username ditemukan, lanjutkan proses membuka kunci
-                        unlockVME(server.host, username, (result) => {
-                            // Tambahkan tombol "Kembali ke Menu Server"
-                            const keyboard = {
-                                inline_keyboard: [
-                                    [
-                                        { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                    ],
-                                ],
-                            };
-
-                            // Kirim pesan hasil membuka kunci dengan tombol
-                            bot.sendMessage(chatId, result, {
+                        unlockVME(server.host, username, async (result) => {
+                            await bot.sendMessage(chatId, result, {
                                 parse_mode: 'Markdown',
-                                reply_markup: keyboard,
+                                reply_markup: backButton
                             });
                         });
                     });
+                });
+
+                bot.on('message', (msg) => {
+                    if (msg.text && msg.chat.id === chatId) {
+                        bot.emit(listenerId, msg);
+                    }
                 });
             });
         }

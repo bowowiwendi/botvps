@@ -1,11 +1,25 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk menghapus SSH di VPS
+// Function to view SSH members (you might want to define this if it's not already defined)
+const viewSSHMembers = (vpsHost, callback) => {
+    const command = `ssh root@${vpsHost} bot-member-ssh`;
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            callback(`Error: ${stderr}`);
+            return;
+        }
+        const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
+                              "```\n" +
+                              stdout +
+                              "\n```";
+        callback(null, formattedOutput);
+    });
+};
+
+// Function to unlock SSH user
 const unlockSSH = (vpsHost, username, callback) => {
     const command = `printf "${username}" | ssh root@${vpsHost} user-unlock.sh`;
-
     exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
         callback(`✅ User \`${username}\` berhasil dibuka.`);
     });
 };
@@ -24,40 +38,47 @@ module.exports = (bot, servers) => {
                 return;
             }
             
-            viewSSHMembers(server.host, (error, result) => {
+            // First show the list of SSH members
+            viewSSHMembers(server.host, async (error, result) => {
                 if (error) {
-                    bot.sendMessage(chatId, error);
+                    await bot.sendMessage(chatId, error);
                     return;
                 }
 
+                // Send the member list
+                await bot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
 
-            // Minta input username dari pengguna
-            await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dibuka:');
+                // Ask for username input
+                await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dibuka:');
 
-            // Tangkap input pengguna
-            bot.once('message', async (msg) => {
-                const username = msg.text;
+                // Set up a one-time message listener
+                bot.once('message', async (msg) => {
+                    // Check if the message comes from the same chat
+                    if (msg.chat.id !== chatId) return;
+                    
+                    const username = msg.text.trim();
 
-                if (!username) {
-                    await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
-                    return;
-                }
+                    if (!username) {
+                        await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
+                        return;
+                    }
 
-                // Panggil fungsi deleteSSH
-                unlockSSH(server.host, username, (result) => {
-                    // Tambahkan tombol "Kembali ke Menu Server"
-                    const keyboard = {
-                        inline_keyboard: [
-                            [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                    // Call the unlock function
+                    unlockSSH(server.host, username, async (result) => {
+                        // Create back button
+                        const keyboard = {
+                            inline_keyboard: [
+                                [
+                                    { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                                ],
                             ],
-                        ],
-                    };
+                        };
 
-                    // Kirim pesan hasil penghapusan dengan tombol
-                    bot.sendMessage(chatId, result, {
-                        parse_mode: 'Markdown',
-                        reply_markup: keyboard,
+                        // Send the result with back button
+                        await bot.sendMessage(chatId, result, {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard,
+                        });
                     });
                 });
             });

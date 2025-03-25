@@ -1,5 +1,6 @@
 const { exec } = require('child_process');
 
+// Function to view SSH members
 const viewSSHMembers = (vpsHost, callback) => {
     const command = `ssh root@${vpsHost} bot-member-ssh`;
 
@@ -9,37 +10,17 @@ const viewSSHMembers = (vpsHost, callback) => {
             return;
         }
 
-        // Format hasil menjadi lebih menarik
+        // Format output
         const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
+                              "```\n" +
+                              stdout +
+                              "\n```";
 
         callback(null, formattedOutput);
     });
 };
 
-// Fungsi untuk melihat member SSH
-const viewSSHMembers = (vpsHost, callback) => {
-    const command = `ssh root@${vpsHost} bot-member-ssh`;
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`Error: ${stderr}`);
-            return;
-        }
-
-        // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
-
-        callback(null, formattedOutput);
-    });
-};
-
-// Fungsi untuk melihat detail SSH
+// Function to view SSH details
 const viewSSHDetails = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "cat /var/www/html/ssh-${username}.txt"`;
 
@@ -49,29 +30,26 @@ const viewSSHDetails = (vpsHost, username, callback) => {
             return;
         }
 
-        // Format hasil menjadi lebih menarik
+        // Format output
         const formattedOutput = `🔍 *DETAIL SSH* 🔍\n\n` +
-                               "```\n" +
-                               stdout +
-                               "\n```";
+                              "```\n" +
+                              stdout +
+                              "\n```";
 
         callback(null, formattedOutput);
     });
 };
 
-// Fungsi untuk mengecek user pada file /etc/shadow
+// Function to check user in /etc/shadow
 const checkUserInShadow = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "grep '^${username}:' /etc/shadow"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            // User tidak ditemukan
-            callback(null, false); // false berarti user tidak ada
+            callback(null, false); // User not found
             return;
         }
-
-        // User ditemukan
-        callback(null, true); // true berarti user ada
+        callback(null, true); // User found
     });
 };
 
@@ -89,14 +67,12 @@ module.exports = (bot, servers) => {
                 return;
             }
 
-            // Panggil fungsi viewSSHMembers
-            viewSSHMembers(server.host, (error, result) => {
+            viewSSHMembers(server.host, async (error, result) => {
                 if (error) {
-                    bot.sendMessage(chatId, error);
+                    await bot.sendMessage(chatId, error);
                     return;
                 }
 
-                // Tambahkan tombol "Kembali ke Pemilihan Server"
                 const keyboard = {
                     inline_keyboard: [
                         [
@@ -105,8 +81,7 @@ module.exports = (bot, servers) => {
                     ],
                 };
 
-                // Kirim pesan dengan tombol
-                bot.sendMessage(chatId, result, {
+                await bot.sendMessage(chatId, result, {
                     parse_mode: 'Markdown',
                     reply_markup: keyboard,
                 });
@@ -115,48 +90,46 @@ module.exports = (bot, servers) => {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
 
-            // Validasi server
             if (!server) {
                 await bot.sendMessage(chatId, 'Server tidak ditemukan.');
                 return;
             }
 
-            // Minta input username dari pengguna
             await bot.sendMessage(chatId, 'Masukkan username SSH:');
 
-            // Tangkap input username
-            bot.once('message', async (msg) => {
-                const username = msg.text;
+            // Use a unique identifier for the message listener
+            const listenerId = `detail_ssh_${chatId}_${Date.now()}`;
+            
+            bot.once(listenerId, async (msg) => {
+                // Check if message is from the same chat
+                if (msg.chat.id !== chatId) return;
 
-                // Validasi username
+                const username = msg.text.trim();
+
                 if (!username) {
                     await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
                     return;
                 }
 
-                // Panggil fungsi checkUserInShadow
-                checkUserInShadow(server.host, username, (error, userExists) => {
+                checkUserInShadow(server.host, username, async (error, userExists) => {
                     if (error) {
-                        bot.sendMessage(chatId, 'Terjadi kesalahan saat mengecek user.');
+                        await bot.sendMessage(chatId, 'Terjadi kesalahan saat mengecek user.');
                         return;
                     }
 
                     if (!userExists) {
-                        // Jika user tidak ada
-                        bot.sendMessage(chatId, `User *${username}* tidak ditemukan.`, {
+                        await bot.sendMessage(chatId, `User *${username}* tidak ditemukan.`, {
                             parse_mode: 'Markdown',
                         });
                         return;
                     }
 
-                    // Jika user ada, lanjutkan proses pengambilan detail SSH
-                    viewSSHDetails(server.host, username, (error, result) => {
+                    viewSSHDetails(server.host, username, async (error, result) => {
                         if (error) {
-                            bot.sendMessage(chatId, error);
+                            await bot.sendMessage(chatId, error);
                             return;
                         }
 
-                        // Tambahkan tombol "Kembali ke Pemilihan Server"
                         const keyboard = {
                             inline_keyboard: [
                                 [
@@ -165,13 +138,19 @@ module.exports = (bot, servers) => {
                             ],
                         };
 
-                        // Kirim pesan dengan tombol
-                        bot.sendMessage(chatId, result, {
+                        await bot.sendMessage(chatId, result, {
                             parse_mode: 'Markdown',
                             reply_markup: keyboard,
                         });
                     });
                 });
+            });
+
+            // Set up the message listener
+            bot.on('message', (msg) => {
+                if (msg.text && !msg.text.startsWith('/')) {
+                    bot.emit(listenerId, msg);
+                }
             });
         }
     });
