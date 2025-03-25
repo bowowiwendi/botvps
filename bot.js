@@ -58,7 +58,7 @@ const broadcast = require('./broadcast');// Import modul broadcast
 
 // Import modul broadcast
 // Konfigurasi bot
-const token = process.env.TELEGRAM_BOT_TOKEN ||'7389923076:AAFWqHuWmCgeGs97TtNOj77AE4ahQpZeIz0'; // Gunakan environment variable
+const token = process.env.TELEGRAM_BOT_TOKEN; // Gunakan environment variable
 const bot = new TelegramBot(token, { polling: true });
 
 // Baca file konfigurasi server
