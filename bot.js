@@ -47,6 +47,13 @@ const delVLE = require('./handlers/delVLE');
 const delSS = require('./handlers/delSS');
 const hadleSetting = require('./commands/hadleSetting');
 const info = require('./commands/info');
+const link = require('./commands/link');
+const reboot = require('./commands/reboot')
+const menuRegist = require('./commands/menuRegist');
+const registIP = require('./commands/registIP');
+const deletIP = require('./commands/deletIP');
+const listIP = require('./commands/listIP');
+const renewIP = require('./commands/renewIP');
 const broadcast = require('./broadcast');// Import modul broadcast
 
 // Import modul broadcast
@@ -126,6 +133,13 @@ const commands = [
     { command: delVLE, params: [bot, servers] },
    { command: hadleSetting, params: [bot, servers] },
     { command: info, params: [bot, servers] },
+    { command: link, params: [bot, servers] },
+    { command: reboot, params: [bot, servers] },
+    { command: renewIP, params: [bot, servers] },
+    { command: listIP, params: [bot, servers] },
+    { command: deletIP, params: [bot, servers] },
+    { command: registIP, params: [bot, servers] },
+    { command: menuRegist, params: [bot, servers] },
 ];
 commands.forEach(cmd => {
     try {

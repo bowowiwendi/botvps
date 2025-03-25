@@ -67,13 +67,14 @@ const createSSH = (vpsHost, username, password, limitDevice, activePeriod, priva
 
                         // Ambil domain dari output JSON
                         const domain = output.domain;
+                        const expired = output.expired;
 
                         // Data SSH yang dihasilkan
                         const sshData = {
                             username: username,
                             password: password,
                             domain: domain, // Domain diambil dari output JSON
-                            expired: `${activePeriod} hari`,
+                            expired: expired,
                             ip_limit: limitDevice,
                         };
 
