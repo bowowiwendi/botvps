@@ -3,7 +3,7 @@
 # Script untuk update bot dengan mempertahankan servers.json dan admins.json
 
 # Direktori kerja
-TARGET_DIR="botvpn"
+TARGET_DIR="botvps"
 BACKUP_DIR="/tmp/botvpn_backup"
 REPO_URL="https://github.com/bowowiwendi/botvps.git"  # Ganti dengan repo Anda
 
