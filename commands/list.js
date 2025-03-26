@@ -8,14 +8,14 @@ const showServerList = (bot, chatId, servers) => {
     keyboard.push([{ text: '🔙 Kembali', callback_data: 'back_to_start' }]);
     
     const message = `
-Selamat datang di VPS Manager Bot! 🚀
-WENDIVPN STORE
-Daftar Harga
-Server SG Perbulan/10k 2 Devices
-Server SG Perbulan/15k STB
-Server ID Perbulan/15k 2 Devices
-Server ID Perbulan/20k STB
-Note: SG=Singapore & ID=Indonesia
+Selamat Datang 
+di WENDI STORE Bot! 🚀
+Daftar Harga :
+- Server SG Perbulan/10k 2 Devices
+- Server SG Perbulan/15k STB
+- Server ID Perbulan/15k 2 Devices
+- Server ID Perbulan/20k STB
+Nb: SG/Singapore,ID/Indonesia
 by @WENDIVPN
 Pilih server:`;
 

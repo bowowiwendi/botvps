@@ -26,7 +26,7 @@ const viewIPMembers = (vpsHost, callback) => {
 
 // Fungsi untuk renew IP
 const renewIP = (vpsHost, username, exp, callback) => {
-    const command = `printf "${username}\n${exp}" | ssh root@${vpsHost} renew-ip`;
+    const command = `printf "${username}\n${exp}" | ssh root@${vpsHost} renew-ip.sh`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {

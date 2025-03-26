@@ -24,12 +24,16 @@ module.exports = (bot) => {
         };
 
         const message = `
-Selamat datang di VPS Manager Bot! 🚀
-**WENDIVPN STORE**
-Anda dapat menggunakan tombol di bawah untuk memilih perintah:
-- 📋 Pilih Server: Daftar Server.
-- ➕ Tambah Server: Tambahkan server baru.
-- ❌ Hapus Server: Hapus server .
+Selamat Datang 
+di WENDI STORE New Bot! 🚀
+Anda dapat menggunakan tombol 
+di bawah untuk memilih perintah:
+- 📋 Pilih Server
+- ➕ Tambah Server
+- ❌ Hapus Server
+- 👤 Manage Admin
+- 📢 Broadcast
+
         `;
 
         bot.sendMessage(chatId, message, {
