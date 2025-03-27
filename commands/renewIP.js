@@ -87,10 +87,6 @@ module.exports = (bot, servers) => {
                                             text: '🔙 Kembali ke Server', 
                                             callback_data: `select_server_${serverIndex}` 
                                         }],
-                                        [{
-                                            text: '🔄 Lihat Daftar Member',
-                                            callback_data: `renew_ip_${serverIndex}`
-                                        }]
                                     ]
                                 };
 

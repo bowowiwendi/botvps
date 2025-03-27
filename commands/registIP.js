@@ -2,7 +2,7 @@ const { exec } = require('child_process');
 
 // Fungsi untuk registrasi IP baru
 const registerIP = (vpsHost, ip, username, exp, callback) => {
-    const command = `ssh root@${vpsHost} "register-ip ${ip} ${username} ${exp}"`;
+    const command = `printf "${ip}\n${username}\n${exp}" | ssh root@${vpsHost} add-vps.sh`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {

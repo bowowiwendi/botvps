@@ -41,7 +41,7 @@ const checkUsernameExists = (vpsHost, username, callback) => {
 
 // Fungsi untuk menghapus IP/user
 const deleteIP = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "delete-ip ${username}"`;
+    const command = `printf "${username}" | ssh root@${vpsHost} del-ip.sh`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
