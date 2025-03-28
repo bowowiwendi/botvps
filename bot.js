@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
+const path = require('path'); // Untuk handle path file
 require('dotenv').config();
 
 // Import commands and handlers
@@ -55,6 +56,7 @@ const registIP = require('./commands/registIP');
 const deletIP = require('./commands/deletIP');
 const listIP = require('./commands/listIP');
 const renewIP = require('./commands/renewIP');
+const Topup = require('./Topup');
 const broadcast = require('./broadcast');// Import modul broadcast
 
 // Import modul broadcast
@@ -141,6 +143,7 @@ const commands = [
     { command: deletIP, params: [bot, servers] },
     { command: registIP, params: [bot, servers] },
     { command: menuRegist, params: [bot, servers] },
+    { command: Topup, params: [bot, servers] },
 ];
 commands.forEach(cmd => {
     try {
@@ -160,6 +163,7 @@ commands.forEach(cmd => {
 // require('./commands/listadmin')(bot);
 // require('./commands/detailadmin')(bot);
 require('./commands/menuAdmin')(bot);
+// require('./commands/topup')(bot);
 
 // Inisialisasi modul broadcast
 broadcast(bot, users);

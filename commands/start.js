@@ -3,7 +3,7 @@ module.exports = (bot) => {
     // Baca database admin
     const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
 
-    // Fungsi untuk menampilkan menu start
+    // Fungsi untuk menampilkan menu start (admin utama)
     const startCommand = (chatId) => {
         const keyboard = {
             inline_keyboard: [
@@ -16,9 +16,11 @@ module.exports = (bot) => {
                 [
                     { text: '❌ Hapus Server', callback_data: 'delete_server' },
                 ],
-                [                    { text: '👤 Manage Admin', callback_data: 'menu_admin' },
+                [
+                    { text: '👤 Manage Admin', callback_data: 'menu_admin' },
                 ],
-                [                    { text: '📢 Broadcast Pesan', callback_data: 'start_broadcast' },
+                [
+                    { text: '📢 Broadcast Pesan', callback_data: 'start_broadcast' },
                 ],
             ],
         };
@@ -33,7 +35,6 @@ di bawah untuk memilih perintah:
 - ❌ Hapus Server
 - 👤 Manage Admin
 - 📢 Broadcast
-
         `;
 
         bot.sendMessage(chatId, message, {
@@ -47,12 +48,23 @@ di bawah untuk memilih perintah:
         const userId = msg.from.id;
 
         // Cek apakah pengguna adalah admin
-        const isAdmin = admins.some(admin => admin.id === userId);
+        const adminData = admins.find(admin => admin.id === userId);
+        const isAdmin = adminData !== undefined;
+        const isPrimaryAdmin = isAdmin && admins[0].id === userId;
 
-        if (isAdmin) {
+        if (!isAdmin) {
+            return bot.sendMessage(chatId, `ID Anda: ${userId}\n\nJika ingin mendaftar, berikan ID ini ke @wendivpn`);
+        }
+
+        if (isPrimaryAdmin) {
             startCommand(chatId);
         } else {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke bot ini.');
+            bot.sendMessage(
+                chatId, 
+                'Selamat Datang Admin!\n\n' +
+                'Gunakan perintah /menu untuk memilih server.\n' +
+                'Atau /help untuk melihat panduan.'
+            );
         }
     });
 
@@ -63,12 +75,24 @@ di bawah untuk memilih perintah:
         const data = query.data;
 
         // Cek apakah pengguna adalah admin
-        const isAdmin = admins.some(admin => admin.id === userId);
+        const adminData = admins.find(admin => admin.id === userId);
+        const isAdmin = adminData !== undefined;
+        const isPrimaryAdmin = isAdmin && admins[0].id === userId;
 
-        if (data === 'back_to_start' && isAdmin) {
-            startCommand(chatId);
-        } else if (!isAdmin) {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke bot ini.');
+        if (!isAdmin) {
+            return bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke bot ini.');
+        }
+
+        if (data === 'back_to_start') {
+            if (isPrimaryAdmin) {
+                startCommand(chatId);
+            } else {
+                bot.sendMessage(
+                    chatId,
+                    'Kembali ke menu utama.\n\n' +
+                    'Gunakan perintah /menu untuk memilih server.'
+                );
+            }
         }
     });
 };

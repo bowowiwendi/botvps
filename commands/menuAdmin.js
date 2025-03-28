@@ -1,280 +1,388 @@
 const fs = require('fs');
-const saveAdmins = require('../utils/saveAdmins'); // Pastikan fungsi ini sudah didefinisikan
+const saveAdmins = require('../utils/saveAdmins');
 
 module.exports = (bot, userState = {}) => {
+    // Helper functions
+    const getAdmins = () => {
+        try {
+            return JSON.parse(fs.readFileSync('admins.json', 'utf8'));
+        } catch (error) {
+            console.error('Error reading admins:', error);
+            return [];
+        }
+    };
+
+    const isAdmin = (userId) => {
+        const admins = getAdmins();
+        return admins.some(admin => admin.id === userId);
+    };
+
+    const admins = getAdmins();
+    const firstAdmin = admins.length > 0 ? admins[0] : null;
+
     // Fungsi untuk menampilkan menu admin
     const showAdminMenu = (chatId) => {
         const menuAdmin = `
-Daftar Menu Admin:
-1. /addadmin - Tambah admin baru.
-Format: /addadmin <ID>
-Contoh: /addadmin 123456789
-2. /deladmin - Hapus admin.
-3. /listadmin - Lihat daftar admin.
-4. /detailadmin - Lihat detail admin.`;
+🛠️ *Menu Admin*:
+1. Tambah admin baru
+2. Hapus admin
+3. Lihat daftar admin
+4. Isi saldo admin`;
 
         const keyboard = {
             inline_keyboard: [
-                [
-                    { text: 'Tambah Admin', callback_data: 'addadmin' },
-                ],
-                [
-                    { text: 'Hapus Admin', callback_data: 'deladmin' },
-                ],
-                [
-                    { text: 'Daftar Admin', callback_data: 'listadmin' },
-                ],
-                [
-                    { text: 'Detail Admin', callback_data: 'detailadmin' },
-                ],
-                [
-                  { text: '🔙 Kembali', callback_data: 'back_to_start' }
-                ],
-            ],
+                [{ text: '➕ Tambah Admin', callback_data: 'addadmin' }],
+                [{ text: '➖ Hapus Admin', callback_data: 'deladmin' }],
+                [{ text: '💳 Isi Saldo', callback_data: 'topup_admin' }],
+                [{ text: '📋 Daftar Admin', callback_data: 'listadmin' }],
+                [{ text: '🔙 Kembali', callback_data: 'back_to_start' }]
+            ]
         };
 
-        bot.sendMessage(chatId, menuAdmin, { reply_markup: JSON.stringify(keyboard) });
+        bot.sendMessage(chatId, menuAdmin, { 
+            parse_mode: 'Markdown',
+            reply_markup: JSON.stringify(keyboard) 
+        });
     };
 
-    // Perintah /detailadmin
-    bot.onText(/\/detailadmin/, (msg) => {
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
+    // Fungsi untuk menampilkan daftar admin untuk topup
+    const showAdminListForTopup = (chatId) => {
+        const admins = getAdmins();
+        const keyboard = {
+            inline_keyboard: [
+                ...admins.map((admin, index) => [{
+                    text: `${admin.name} (Saldo: ${admin.saldo || 0})`,
+                    callback_data: `select_admin_${index}`
+                }]),
+                [{ text: '🔙 Kembali', callback_data: 'menu_admin' }]
+            ]
+        };
 
-        const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
-        const isAdmin = admins.some(admin => admin.id === userId);
+        bot.sendMessage(chatId, 'Pilih admin untuk topup:', {
+            reply_markup: JSON.stringify(keyboard)
+        });
+    };
 
-        if (isAdmin) {
-            const admin = admins.find(admin => admin.id === userId);
-            const detailAdmin = `
-📋 Detail Admin:
-- Nama: ${admin.name}
-- Username: ${admin.username}
-- ID: ${admin.id}`;
-
-            const keyboard = {
-                inline_keyboard: [
-                    [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                ],
-            };
-
-            bot.sendMessage(chatId, detailAdmin, { reply_markup: JSON.stringify(keyboard) });
-        } else {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke perintah ini.');
+    // Fungsi untuk mengirim notifikasi topup
+    const sendTopupNotifications = async ({ admin, amount, chatId, msg }) => {
+        try {
+            // Kirim notifikasi ke admin penerima topup
+            await bot.sendMessage(
+                admin.id,
+                `💳 Anda menerima topup ${amount}\n` +
+                `Saldo baru: ${admin.saldo}`
+            );
+        } catch (error) {
+            console.log('Gagal mengirim notifikasi ke penerima');
         }
-    });
 
-    // Perintah /listadmin
-    bot.onText(/\/listadmin/, (msg) => {
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
+        // Kirim notifikasi ke admin pertama (jika bukan diri sendiri)
+       
+            try {
+                await bot.sendMessage(
+                    firstAdmin.id,
+                    `📢 NOTIFIKASI TOPUP\n\n` +
+                    `Admin pelaksana: ${msg.from.first_name} (ID: ${msg.from.id})\n` +
+                    `Penerima: ${admin.name} (ID: ${admin.id})\n` +
+                    `Jumlah: ${amount}\n` +
+                    `Saldo baru penerima: ${admin.saldo}\n\n` +
+                    `Waktu: ${new Date().toLocaleString()}`
+                );
+            } catch (error) {
+                console.error('Gagal mengirim notifikasi ke admin pertama:', error);
+                await bot.sendMessage(chatId, '❌ Gagal mengirim notifikasi', {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [[{
+                            text: '🔙 Menu Admin',
+                            callback_data: 'menu_admin'
+                        }]]
+                    })
+                });
+            }
+    };
 
-        const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
-        const isAdmin = admins.some(admin => admin.id === userId);
-
-        if (isAdmin) {
-            const adminList = admins.map(admin => `- ${admin.name} (${admin.username})`).join('\n');
-            const keyboard = {
-                inline_keyboard: [
-                    [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                ],
-            };
-
-            bot.sendMessage(chatId, `Daftar Admin:\n${adminList}`, { reply_markup: JSON.stringify(keyboard) });
-        } else {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke perintah ini.');
-        }
-    });
-
-    // Perintah /deladmin
-    bot.onText(/\/deladmin/, (msg) => {
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
-
-        const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
-        const isAdmin = admins.some(admin => admin.id === userId);
-
-        if (isAdmin) {
-            const keyboard = admins.map((admin, index) => [
-                {
-                    text: `${admin.name} (${admin.username})`,
-                    callback_data: `delete_admin_${index}`,
-                },
-            ]);
-
-            keyboard.push([{ text: '🔙 Kembali', callback_data: 'menu_admin' }]);
-
-            bot.sendMessage(chatId, 'Pilih admin yang ingin dihapus:', {
-                reply_markup: { inline_keyboard: keyboard },
-            });
-        } else {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke perintah ini.');
-        }
-    });
-
-    // Perintah /addadmin
+    // Command handlers
     bot.onText(/\/addadmin/, (msg) => {
         const chatId = msg.chat.id;
-        const userId = msg.from.id;
-
-        const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
-        const isAdmin = admins.some(admin => admin.id === userId);
-
-        if (isAdmin) {
-            userState[chatId] = { action: 'add_admin' };
-            const keyboard = {
-                inline_keyboard: [
-                    [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                ],
-            };
-
-            bot.sendMessage(chatId, 'Masukkan ID Telegram admin baru:', { reply_markup: JSON.stringify(keyboard) });
-        } else {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke perintah ini.');
+        if (!isAdmin(msg.from.id)) {
+            return bot.sendMessage(chatId, '❌ Akses ditolak: Hanya untuk admin');
         }
+
+        userState[chatId] = { action: 'add_admin' };
+        bot.sendMessage(chatId, 'Masukkan ID Telegram admin baru:', {
+            reply_markup: JSON.stringify({
+                inline_keyboard: [[{ text: '🔙 Batalkan', callback_data: 'menu_admin' }]]
+            })
+        });
     });
 
-    // Tangani callback query
+    bot.onText(/\/topup/, (msg) => {
+        const chatId = msg.chat.id;
+        if (!isAdmin(msg.from.id)) {
+            return bot.sendMessage(chatId, '❌ Akses ditolak: Hanya untuk admin');
+        }
+        showAdminListForTopup(chatId);
+    });
+
+    // Callback query handler
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const userId = query.from.id;
         const data = query.data;
+        const messageId = query.message.message_id;
 
-        const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
-        const isAdmin = admins.some(admin => admin.id === userId);
-
-        if (!isAdmin) {
-            bot.sendMessage(chatId, 'Maaf, Anda tidak memiliki akses ke perintah ini.');
-            return;
+        if (!isAdmin(userId)) {
+            return bot.answerCallbackQuery(query.id, { 
+                text: '❌ Akses ditolak', 
+                show_alert: true 
+            });
         }
 
-        switch (true) {
-            case data === 'addadmin':
-                // Set state untuk menambahkan admin
-                userState[chatId] = { action: 'add_admin' };
-                const keyboardAddAdmin = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                    ],
-                };
+        try {
+            const admins = getAdmins();
+            
+            switch (data) {
+                case 'addadmin':
+                    userState[chatId] = { action: 'add_admin' };
+                    await bot.editMessageText('Masukkan ID Telegram admin baru:', {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        reply_markup: {
+                            inline_keyboard: [[{ text: '🔙 Batalkan', callback_data: 'menu_admin' }]]
+                        }
+                    });
+                    break;
 
-                bot.sendMessage(chatId, 'Masukkan ID Telegram admin baru:', { reply_markup: JSON.stringify(keyboardAddAdmin) });
-                break;
+                case 'deladmin':
+                    const deleteButtons = admins.map((admin, index) => [{
+                        text: `${admin.name} (@${admin.username || 'no-username'})`,
+                        callback_data: `delete_admin_${index}`
+                    }]);
+                    
+                    deleteButtons.push([{ text: '🔙 Kembali', callback_data: 'menu_admin' }]);
+                    
+                    await bot.editMessageText('🗑️ Pilih admin yang akan dihapus:', {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        reply_markup: { inline_keyboard: deleteButtons }
+                    });
+                    break;
 
-            case data === 'deladmin':
-                // Tampilkan daftar admin untuk dihapus
-                const keyboardDelAdmin = admins.map((admin, index) => [
-                    {
-                        text: `${admin.name} (${admin.username})`,
-                        callback_data: `delete_admin_${index}`,
-                    },
-                ]);
+                case 'listadmin':
+                    const adminButtons = admins.map(admin => [{
+                        text: `${admin.name} (@${admin.username || 'no-username'})`,
+                        callback_data: `admin_detail_${admin.id}`
+                    }]);
+                    
+                    adminButtons.push([{ text: '🔙 Kembali', callback_data: 'menu_admin' }]);
+                    
+                    await bot.editMessageText('📋 Daftar Admin\nPilih untuk melihat detail:', {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        reply_markup: { inline_keyboard: adminButtons }
+                    });
+                    break;
 
-                keyboardDelAdmin.push([{ text: '🔙 Kembali', callback_data: 'menu_admin' }]);
-
-                bot.sendMessage(chatId, 'Pilih admin yang ingin dihapus:', {
-                    reply_markup: { inline_keyboard: keyboardDelAdmin },
-                });
-                break;
-
-            case data.startsWith('delete_admin_'):
-                const adminIndex = parseInt(data.split('_')[2], 10);
-                if (adminIndex >= 0 && adminIndex < admins.length) {
-                    const admin = admins[adminIndex];
-                    admins.splice(adminIndex, 1);
-                    saveAdmins(admins);
-
-                    const keyboardDeleteAdmin = {
-                        inline_keyboard: [
-                            [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                        ],
-                    };
-
-                    bot.sendMessage(chatId, `Admin "${admin.name}" (${admin.username}) telah dihapus.`, { reply_markup: JSON.stringify(keyboardDeleteAdmin) });
-                } else {
-                    bot.sendMessage(chatId, 'Admin yang dipilih tidak valid.');
-                }
-                break;
-
-            case data === 'listadmin':
-                const adminList = admins.map(admin => `- ${admin.name} (${admin.username})`).join('\n');
-                const keyboardListAdmin = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                    ],
-                };
-
-                bot.sendMessage(chatId, `Daftar Admin:\n${adminList}`, { reply_markup: JSON.stringify(keyboardListAdmin) });
-                break;
-
-            case data === 'detailadmin':
-                const admin = admins.find(admin => admin.id === userId);
-                const detailAdmin = `
+                case data.match(/^admin_detail_/)?.input:
+                    const adminId = parseInt(data.split('_')[2]);
+                    const detailAdmin = admins.find(a => a.id === adminId);
+                    
+                    if (!detailAdmin) {
+                        return bot.answerCallbackQuery(query.id, {
+                            text: 'Admin tidak ditemukan',
+                            show_alert: true
+                        });
+                    }
+                    
+                    const detailText = `
 📋 Detail Admin:
-- Nama: ${admin.name}
-- Username: ${admin.username}
-- ID: ${admin.id}`;
+Nama: ${detailAdmin.name}
+Username: @${detailAdmin.username || 'no-username'}
+ID: ${detailAdmin.id}
+Saldo: ${detailAdmin.saldo || 0}`;
+                    
+                    await bot.editMessageText(detailText, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ 
+                                    text: '💳 Isi Saldo', 
+                                    callback_data: `select_admin_${admins.findIndex(a => a.id === adminId)}` 
+                                }],
+                                [{ 
+                                    text: '🗑️ Hapus Admin', 
+                                    callback_data: `delete_admin_${admins.findIndex(a => a.id === adminId)}` 
+                                }],
+                                [{ 
+                                    text: '🔙 Kembali ke Daftar', 
+                                    callback_data: 'listadmin' 
+                                }]
+                            ]
+                        }
+                    });
+                    break;
 
-                const keyboardDetailAdmin = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                    ],
-                };
+                case 'topup_admin':
+                    showAdminListForTopup(chatId);
+                    break;
 
-                bot.sendMessage(chatId, detailAdmin, { reply_markup: JSON.stringify(keyboardDetailAdmin) });
-                break;
+                case data.match(/^delete_admin_/)?.input:
+                    const deleteIndex = parseInt(data.split('_')[2]);
+                    if (deleteIndex >= 0 && deleteIndex < admins.length) {
+                        const deletedAdmin = admins[deleteIndex];
+                        admins.splice(deleteIndex, 1);
+                        await saveAdmins(admins);
+                        
+                        await bot.editMessageText(`Admin ${deletedAdmin.name} telah dihapus`, {
+                            chat_id: chatId,
+                            message_id: messageId,
+                            reply_markup: {
+                                inline_keyboard: [[{ text: '🔙 Menu Admin', callback_data: 'menu_admin' }]]
+                            }
+                        });
+                    }
+                    break;
 
-            case data === 'menu_admin':
-                bot.answerCallbackQuery(query.id);
-                showAdminMenu(chatId);
-                break;
+                case data.match(/^select_admin_/)?.input:
+                    const topupIndex = parseInt(data.split('_')[2]);
+                    if (topupIndex >= 0 && topupIndex < admins.length) {
+                        userState[chatId] = {
+                            action: 'topup_admin',
+                            adminIndex: topupIndex
+                        };
+                        
+                        await bot.editMessageText(
+                            `Masukkan jumlah saldo untuk ${admins[topupIndex].name}:\n\nContoh: 50000`, 
+                            {
+                                chat_id: chatId,
+                                message_id: messageId,
+                                reply_markup: {
+                                    inline_keyboard: [[{ text: '🔙 Batalkan', callback_data: 'menu_admin' }]]
+                                }
+                            }
+                        );
+                    }
+                    break;
+
+                case 'menu_admin':
+                    showAdminMenu(chatId);
+                    break;
+            }
+            
+            await bot.answerCallbackQuery(query.id);
+        } catch (error) {
+            console.error('Callback error:', error);
+            await bot.answerCallbackQuery(query.id, {
+                text: '⚠️ Terjadi error',
+                show_alert: true
+            });
         }
     });
 
-    // Tangani pesan teks (untuk /addadmin)
+    // Message handler
     bot.on('message', async (msg) => {
+        if (msg.text?.startsWith('/')) return;
+        
         const chatId = msg.chat.id;
         const text = msg.text;
+        const state = userState[chatId];
 
-        if (userState[chatId] && userState[chatId].action === 'add_admin') {
-            const newAdminId = parseInt(text);
+        if (!state) return;
 
-            if (isNaN(newAdminId)) {
-                bot.sendMessage(chatId, 'ID tidak valid. Harap masukkan angka ID Telegram.');
-                delete userState[chatId];
-                return;
-            }
-
-            try {
-                const userInfo = await bot.getChat(newAdminId);
-                const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
-
-                const isAdminExists = admins.some(admin => admin.id === newAdminId);
-                if (isAdminExists) {
-                    bot.sendMessage(chatId, `Admin dengan ID ${newAdminId} sudah terdaftar.`);
-                    delete userState[chatId];
-                    return;
+        try {
+            if (state.action === 'add_admin') {
+                const newAdminId = parseInt(text);
+                if (isNaN(newAdminId)) {
+                    return bot.sendMessage(chatId, '❌ ID harus berupa angka', {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [[{ text: '🔙 Kembali', callback_data: 'menu_admin' }]]
+                        })
+                    });
                 }
 
-                admins.push({
-                    id: newAdminId,
-                    username: userInfo.username || 'tidak ada username',
-                    name: userInfo.first_name || 'tidak ada nama',
+                const admins = getAdmins();
+                if (admins.some(a => a.id === newAdminId)) {
+                    return bot.sendMessage(chatId, '❌ Admin sudah terdaftar', {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [[{ text: '🔙 Kembali', callback_data: 'menu_admin' }]]
+                        })
+                    });
+                }
+
+                try {
+                    const userInfo = await bot.getChat(newAdminId);
+                    admins.push({
+                        id: newAdminId,
+                        username: userInfo.username,
+                        name: userInfo.first_name || 'No Name',
+                        saldo: 0
+                    });
+                    await saveAdmins(admins);
+                    
+                    bot.sendMessage(chatId, 
+                        `✅ Admin baru ditambahkan:\n\n` +
+                        `Nama: ${userInfo.first_name}\n` +
+                        `Username: @${userInfo.username || 'no-username'}\n` +
+                        `ID: ${newAdminId}`, {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [[{ text: '🔙 Menu Admin', callback_data: 'menu_admin' }]]
+                        })
+                    });
+                } catch (error) {
+                    bot.sendMessage(chatId, '❌ Gagal mendapatkan info pengguna', {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [[{ text: '🔙 Kembali', callback_data: 'menu_admin' }]]
+                        })
+                    });
+                }
+
+            } else if (state.action === 'topup_admin') {
+                const amount = parseInt(text.replace(/\D/g, ''));
+                if (isNaN(amount)) {
+                    return bot.sendMessage(chatId, '❌ Jumlah tidak valid', {
+                        reply_markup: JSON.stringify({
+                            inline_keyboard: [[{ text: '🔙 Kembali', callback_data: 'menu_admin' }]]
+                        })
+                    });
+                }
+
+                const admins = getAdmins();
+                const admin = admins[state.adminIndex];
+                
+                admin.saldo = (admin.saldo || 0) + amount;
+                await saveAdmins(admins);
+
+                await sendTopupNotifications({
+                    bot,
+                    admin,
+                    amount,
+                    chatId,
+                    firstAdmin,
+                    msg
                 });
-                saveAdmins(admins);
 
-                const keyboardAddAdminSuccess = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: 'menu_admin' }],
-                    ],
-                };
-
-                bot.sendMessage(chatId, `Admin baru telah ditambahkan:\n\nID: ${newAdminId}\nUsername: ${userInfo.username || 'tidak ada username'}\nNama: ${userInfo.first_name || 'tidak ada nama'}`, { reply_markup: JSON.stringify(keyboardAddAdminSuccess) });
-            } catch (error) {
-                bot.sendMessage(chatId, `Gagal mendapatkan informasi pengguna dengan ID ${newAdminId}. Pastikan ID valid dan bot sudah berinteraksi dengan pengguna tersebut.`);
+                await bot.sendMessage(chatId, `✅ Topup ${amount} berhasil untuk ${admin.name}`, {
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [[{ text: '🔙 Menu Admin', callback_data: 'menu_admin' }]]
+                    })
+                });
             }
 
             delete userState[chatId];
+        } catch (error) {
+            console.error('Message handler error:', error);
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan', {
+                reply_markup: JSON.stringify({
+                    inline_keyboard: [[{ text: '🔙 Menu Admin', callback_data: 'menu_admin' }]]
+                })
+            });
         }
     });
+
+    return {
+        showAdminMenu,
+        showAdminListForTopup,
+        sendTopupNotifications
+    };
 };
