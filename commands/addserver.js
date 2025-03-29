@@ -1,72 +1,73 @@
 const saveServers = require('../utils/saveServers');
+const { exec } = require('child_process');
 
 module.exports = (bot, userState, servers) => {
-    // Fungsi untuk memulai mode tambah server
-    const startAddServer = (chatId) => {
-        userState[chatId] = { action: 'add_server' };
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '🔙 Kembali', callback_data: 'back_to_start' }],
-            ],
-        };
+    // Fungsi untuk ssh-copy-id (password tidak disimpan)
+    const runSSHCopyId = (host, password, chatId, callback) => {
+        const publicKeyPath = '/root/.ssh/id_rsa.pub';
+        const command = `sshpass -p "${password}" ssh-copy-id -i ${publicKeyPath} root@${host}`;
 
-        bot.sendMessage(chatId, 'Masukkan detail server dalam format:\n\nNama Host PathPrivateKey Domain\n\nContoh:\nServerBaru 192.168.1.3 /path/to/private/key/id_rsa example.com', { reply_markup: JSON.stringify(keyboard) });
+        exec(command, (error) => {
+            if (error) {
+                bot.sendMessage(chatId, `❌ Gagal menyalin kunci SSH. Pastikan:\n1. Password benar\n2. Server aktif\n\nError: ${error.message}`);
+                return;
+            }
+            callback();
+        });
     };
 
     // Perintah /addserver
     bot.onText(/\/addserver/, (msg) => {
         const chatId = msg.chat.id;
-        startAddServer(chatId);
+        userState[chatId] = { action: 'add_server_step1' };
+        bot.sendMessage(chatId, 'Masukkan detail server dalam format:\n\nNama Host Domain\n\nContoh:\nServerBaru 192.168.1.100 example.com');
     });
 
-    // Tangani callback query (tombol "➕ Tambah Server")
-    bot.on('callback_query', (query) => {
-        const chatId = query.message.chat.id;
-        const data = query.data;
-
-        if (data === 'add_server') {
-            startAddServer(chatId);
-        }
-    });
-
-    // Tangani pesan teks (detail server yang dikirim pengguna)
+    // Handler pesan
     bot.on('message', (msg) => {
         const chatId = msg.chat.id;
-        const text = msg.text;
+        const text = msg.text?.trim();
 
-        if (userState[chatId] && userState[chatId].action === 'add_server') {
+        // Step 1: Terima nama, host, dan domain
+        if (userState[chatId]?.action === 'add_server_step1') {
             const details = text.split(' ');
-            if (details.length !== 4) {
-                const keyboard = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: 'back_to_start' }],
-                    ],
-                };
-
-                bot.sendMessage(chatId, 'Format tidak valid. Pastikan format:\n\nNama Host PathPrivateKey Domain\n\nContoh:\nServerBaru 192.168.1.3 /path/to/private/key/id_rsa example.com', { reply_markup: JSON.stringify(keyboard) });
-                delete userState[chatId];
+            if (details.length !== 3) {
+                bot.sendMessage(chatId, 'Format salah! Gunakan: Nama Host Domain\nContoh: ServerBaru 192.168.1.100 example.com');
                 return;
             }
 
-            const [name, host, privateKey, domain] = details;
+            const [name, host, domain] = details;
+            userState[chatId] = {
+                action: 'add_server_step2',
+                serverDetails: { name, host, domain }
+            };
+
+            // Minta password (hanya untuk ssh-copy-id)
+            bot.sendMessage(chatId, 'Masukkan password root server (untuk ssh-copy-id, tidak disimpan):');
+        }
+
+        // Step 2: Terima password & proses
+        else if (userState[chatId]?.action === 'add_server_step2') {
+            const password = text;
+            const { name, host, domain } = userState[chatId].serverDetails;
+
+            // Simpan server dengan konfigurasi standar + domain
             servers.push({
                 name,
                 host,
-                port: 22, // Port diisi otomatis dengan 22
-                username: 'root', // Username diisi otomatis dengan root
-                privateKey,
-                domain, // Tambahkan domain ke objek server
+                port: 22,
+                username: 'root',
+                privateKey: '/root/.ssh/id_rsa',
+                domain,  // Ditambahkan
             });
             saveServers(servers);
 
-            const keyboard = {
-                inline_keyboard: [
-                    [{ text: '🔙 Kembali', callback_data: 'back_to_start' }],
-                ],
-            };
-
-            bot.sendMessage(chatId, `Server "${name}" dengan domain "${domain}" telah ditambahkan.\n\nDetail:\n- Host: ${host}\n- Port: 22\n- Username: root`, { reply_markup: JSON.stringify(keyboard) });
-            delete userState[chatId];
+            // Jalankan ssh-copy-id
+            bot.sendMessage(chatId, 'Sedang menyalin kunci SSH...');
+            runSSHCopyId(host, password, chatId, () => {
+                bot.sendMessage(chatId, `✅ Server "${name}" berhasil ditambahkan!\n\n- Host: ${host}\n- Domain: ${domain}\n- SSH Key: /root/.ssh/id_rsa`);
+                delete userState[chatId];
+            });
         }
     });
 };

@@ -22,6 +22,9 @@ module.exports = (bot) => {
                 [
                     { text: '📢 Broadcast Pesan', callback_data: 'start_broadcast' },
                 ],
+                [
+                  { text: '⚙️ Edit QR & Caption (Admin)', callback_data: 'edit_topup_config' }
+                ],
             ],
         };
 
