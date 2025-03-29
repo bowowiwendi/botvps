@@ -1,9 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Initialize userState if not already defined
-const userState = {};
-
 const updateUserSaldo = (userId, amount) => {
   const data = getAdminData();
   const user = data.find(u => u.id.toString() === userId.toString());
@@ -18,8 +15,7 @@ const updateUserSaldo = (userId, amount) => {
   }
   return false;
 };
-
-const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
+// Fungsi untuk membaca data dari admins.json
 // Fungsi untuk membaca data dari admins.json
 const getAdminData = () => {
   try {
@@ -41,20 +37,6 @@ const findUser = (chatId) => {
   };
 };
 
-let welcomePhoto = 'https://example.com/default-welcome.jpg';
-
-// Fungsi untuk update foto welcome
-const updateWelcomePhoto = (newPhoto) => {
-  welcomePhoto = newPhoto;
-  // Simpan ke file jika ingin persistensi
-  fs.writeFileSync(path.join(__dirname, 'welcome_photo.txt'), newPhoto);
-};
-
-// Baca foto welcome saat startup (jika ada)
-if (fs.existsSync(path.join(__dirname, 'welcome_photo.txt'))) {
-  welcomePhoto = fs.readFileSync(path.join(__dirname, 'welcome_photo.txt'), 'utf8');
-}
-
 const showServerList = (bot, chatId, servers) => {
   const user = findUser(chatId);
   
@@ -66,80 +48,36 @@ const showServerList = (bot, chatId, servers) => {
   ]);
   keyboard.push([{ text: '💳 Topup', callback_data: 'topup_saldo' }]);
   
-  const caption = `
+  const message = `
 👋 Selamat Datang, ${user.name} (@${user.username})!
 
 💰 Saldo Anda: Rp ${user.saldo.toLocaleString()}
 
 📌 WENDI STORE Bot 🚀
-\`\`\`
 Daftar Harga:
 - Server SG Perbulan/10k 2 Devices
 - Server SG Perbulan/15k STB
 - Server ID Perbulan/15k 2 Devices
 - Server ID Perbulan/20k STB
-\`\`\`
+
 Nb: SG/Singapore, ID/Indonesia
 by @WENDIVPN
 
 Pilih server:`;
 
-  bot.sendPhoto(chatId, welcomePhoto, {
-    caption: caption,
-    reply_markup: { inline_keyboard: keyboard },
+  bot.sendMessage(chatId, message, {
+    reply_markup: {
+      inline_keyboard: keyboard,
+    },
     parse_mode: 'Markdown'
   });
 };
 
-// Modifikasi handler callback untuk menyertakan data user
 module.exports = (bot, servers) => {
   // Perintah /menu
   bot.onText(/\/menu/, (msg) => {
     const chatId = msg.chat.id;
     showServerList(bot, chatId, servers);
-  });
-  
-  bot.onText(/\/setwelcomephoto/, async (msg) => {
-    const chatId = msg.chat.id;
-    const user = findUser(chatId);
-    
-    // Cek apakah admin
-      const adminData = admins.find(admin => admin.id === chatId);
-      const isAdmin = adminData !== undefined;
-      const isPrimaryAdmin = isAdmin && admins[0].id === chatId;
-
-       if (!isPrimaryAdmin) {
-  return bot.sendMessage(chatId, '❌ Hanya admin utama');
-       }
-
-        bot.sendMessage(chatId, 'Silakan kirim foto baru untuk welcome message:', {
-          reply_markup: { force_reply: true }
-       });
-
-    // Simpan state untuk menunggu foto
-    userState[chatId] = { waitingForPhoto: true };
-  });
-
-  // Tangani foto yang dikirim
-  bot.on('photo', async (msg) => {
-    const chatId = msg.chat.id;
-    const user = findUser(chatId);
-    
-    if (userState[chatId]?.waitingForPhoto) {
-      try {
-        // Dapatkan file_id foto dengan kualitas terbaik (yang terakhir di array)
-        const fileId = msg.photo[msg.photo.length - 1].file_id;
-        updateWelcomePhoto(fileId);
-        
-        await bot.sendMessage(chatId, '✅ Foto welcome berhasil diperbarui!');
-        delete userState[chatId];
-        
-        // Tampilkan preview
-        await bot.sendPhoto(chatId, fileId, { caption: 'Foto welcome baru:' });
-      } catch (error) {
-        await bot.sendMessage(chatId, '❌ Gagal mengupdate foto: ' + error.message);
-      }
-    }
   });
 
   bot.on('callback_query', async (query) => {
@@ -169,12 +107,12 @@ module.exports = (bot, servers) => {
       const message = `
 👋 Hai, ${user.name} (@${user.username})!
 💰 Saldo: Rp ${user.saldo.toLocaleString()}
-\`\`\`
+
 📋 Keterangan Server:
 • Nama: ${server.name}
 • Host: ${server.host}
 • Domain: ${server.domain}
-\`\`\`
+
 by @WENDIVPN`;
 
       await bot.editMessageText(message, {
@@ -183,52 +121,68 @@ by @WENDIVPN`;
         reply_markup: keyboard,
         parse_mode: 'Markdown'
       });
-    } else if (data.startsWith('ssh_')) {
-      const serverIndex = data.split('_')[1];
-      const server = servers[serverIndex];
+        } else if (data.startsWith('ssh_')) {
+            const serverIndex = data.split('_')[1];
+            const server = servers[serverIndex];
 
-      if (!server) {
-        await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-        return;
-      }
+            if (!server) {
+                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                return;
+            }
 
-      // Hapus pesan lama
-      await bot.deleteMessage(chatId, messageId);
+            // Hapus pesan lama
+            await bot.deleteMessage(chatId, messageId);
 
-      // Tampilkan sub menu SSH
-      const keyboard = {
-        inline_keyboard: [
-          [{ text: 'Create SSH', callback_data: `create_ssh_${serverIndex}` }],
-          [{ text: 'Trial SSH', callback_data: `trial_ssh_${serverIndex}` }],
-          [{ text: 'Delete SSH', callback_data: `delete_ssh_${serverIndex}` }],
-          [{ text: 'List SSH', callback_data: `list_member_${serverIndex}` }],
-          [{ text: 'Renew SSH', callback_data: `renew_ssh_${serverIndex}` }],
-          [{ text: 'Detail SSH', callback_data: `detail_ssh_${serverIndex}` }],
-          [{ text: 'Lock SSH', callback_data: `lock_ssh_${serverIndex}` }],
-          [{ text: 'Unlock SSH', callback_data: `unlock_ssh_${serverIndex}` }],              
-          [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
-        ],
-      };
-      
-      const message = `
+            // Tampilkan sub menu SSH
+            const keyboard = {
+                inline_keyboard: [
+                    [
+                        { text: 'Create SSH', callback_data: `create_ssh_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Trial SSH', callback_data: `trial_ssh_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Delete SSH', callback_data: `delete_ssh_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'List SSH', callback_data: `list_member_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Renew SSH', callback_data: `renew_ssh_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Detail SSH', callback_data: `detail_ssh_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Lock SSH', callback_data: `lock_ssh_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Unlock SSH', callback_data: `unlock_ssh_${serverIndex}` },
+                    ],              
+                    [
+                        { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                    ],
+                ],
+            };
+            
+            const message = `
 👋 Hai, ${user.name} (@${user.username})!
 💰 Saldo: Rp ${user.saldo.toLocaleString()}
-\`\`\`
-📋 Keterangan Server Dipilih:
-- Nama: ${server.name}
-- Host: ${server.host}
-- Domain: ${server.domain}
-\`\`\`
-by @WENDIVPN
-`;
-      await bot.sendMessage(chatId, message, {
-        reply_markup: keyboard,
-        parse_mode: 'Markdown'
-      });
-    } else if (data === 'list_servers') {
-      // Hapus pesan lama
-      await bot.deleteMessage(chatId, messageId);
-      showServerList(bot, chatId, servers);
-    }
-  });
+
+📋 Keterangan Server:
+• Nama: ${server.name}
+• Host: ${server.host}
+• Domain: ${server.domain}
+
+by @WENDIVPN`;
+            await bot.sendMessage(chatId, message, {
+                reply_markup: keyboard,
+            });
+        } else if (data === 'list_servers') {
+            // Hapus pesan lama
+            await bot.deleteMessage(chatId, messageId);
+            showServerList(bot, chatId, servers, user);
+        }
+    });
 };

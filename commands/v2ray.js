@@ -1,3 +1,41 @@
+const fs = require('fs');
+const path = require('path');
+
+const updateUserSaldo = (userId, amount) => {
+  const data = getAdminData();
+  const user = data.find(u => u.id.toString() === userId.toString());
+  
+  if (user) {
+    user.saldo += amount;
+    fs.writeFileSync(
+      path.join(__dirname, '../admins.json'),
+      JSON.stringify(data, null, 2)
+    );
+    return true;
+  }
+  return false;
+};
+
+const getAdminData = () => {
+  try {
+    const data = fs.readFileSync(path.join(__dirname, '../admins.json'), 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Error reading admins.json:', err);
+    return [];
+  }
+};
+
+// Fungsi untuk mencari user berdasarkan chatId
+const findUser = (chatId) => {
+  const adminData = getAdminData();
+  return adminData.find(user => user.id.toString() === chatId.toString()) || { 
+    name: 'User', 
+    saldo: 0,
+    username: 'Guest'
+  };
+};
+
 module.exports = (bot, servers) => {
     // Fungsi untuk membuat submenu
     const createSubMenu = (prefix, serverIndex) => {
@@ -39,6 +77,7 @@ module.exports = (bot, servers) => {
         const chatId = query.message.chat.id;
         const messageId = query.message.message_id; // ID pesan yang akan dihapus
         const data = query.data;
+        const user = findUser(chatId);
 
         try {
             if (data.startsWith('v2ray_')) {
@@ -52,12 +91,15 @@ module.exports = (bot, servers) => {
 
                 // Tampilkan Keterangan Server
                 const serverDescription = `
-📋 Keterangan Server yang Dipilih:
-- Nama: ${server.name}
-- Host: ${server.host}
-- Domain: ${server.domain}
-by @WENDIVPN
-                `;
+👋 Hai, ${user.name} (@${user.username})!
+💰 Saldo: Rp ${user.saldo.toLocaleString()}
+
+📋 Keterangan Server:
+• Nama: ${server.name}
+• Host: ${server.host}
+• Domain: ${server.domain}
+
+by @WENDIVPN`;
 
                 // Tampilkan menu V2RAY dengan semua opsi
                 const keyboard = {
@@ -102,6 +144,7 @@ by @WENDIVPN
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const data = query.data;
+        const user = findUser(chatId);
 
         try {
             if (data.startsWith('vme_') || data.startsWith('vle_') || data.startsWith('troj_') || data.startsWith('ss_')) {
@@ -114,10 +157,14 @@ by @WENDIVPN
                 }
                 
 const serverDescription = `
-📋 Keterangan Server yang Dipilih:
-- Nama: ${server.name}
-- Host: ${server.host}
-- Protokol : ${prefix.toUpperCase()}
+👋 Hai, ${user.name} (@${user.username})!
+💰 Saldo: Rp ${user.saldo.toLocaleString()}
+
+📋 Keterangan Server:
+• Nama: ${server.name}
+• Host: ${server.host}
+• Domain: ${server.domain}
+
 by @WENDIVPN
                 `;
                 // Tampilkan submenu sesuai prefix
