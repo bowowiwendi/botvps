@@ -6,8 +6,8 @@ require('dotenv').config();
 // Import commands and handlers
 const startCommand = require('./commands/start');
 const listCommand = require('./commands/list');
-const addServerCommand = require('./commands/addserver');
-const delServerCommand = require('./commands/delserver');
+// const addServerCommand = require('./commands/addserver');
+// const delServerCommand = require('./commands/delserver');
 const v2rayCommand = require('./commands/v2ray');
 const createSSH = require('./handlers/createSSH');
 const delSSH = require('./handlers/delSSH');
@@ -56,6 +56,7 @@ const registIP = require('./commands/registIP');
 const deletIP = require('./commands/deletIP');
 const listIP = require('./commands/listIP');
 const renewIP = require('./commands/renewIP');
+const manageDetail = require('./commands/manageDetail');
 const Topup = require('./Topup');
 const broadcast = require('./broadcast');// Import modul broadcast
 
@@ -93,8 +94,8 @@ const userState = {};
 const commands = [
     { command: startCommand, params: [bot] },
     { command: listCommand, params: [bot, servers] },
-    { command: addServerCommand, params: [bot, userState, servers] },
-    { command: delServerCommand, params: [bot, userState, servers] },
+  // { command: addServerCommand, params: [bot, userState, servers] },
+  //   { command: delServerCommand, params: [bot, userState, servers] },
     { command: v2rayCommand, params: [bot, servers] },
     { command: createSSH, params: [bot, servers] },
     { command: delSSH, params: [bot, servers] },
@@ -144,6 +145,7 @@ const commands = [
     { command: registIP, params: [bot, servers] },
     { command: menuRegist, params: [bot, servers] },
     { command: Topup, params: [bot, servers] },
+   { command: manageDetail, params: [bot, servers] },
 ];
 commands.forEach(cmd => {
     try {

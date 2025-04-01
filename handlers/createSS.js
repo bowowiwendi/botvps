@@ -1,37 +1,66 @@
 const { Client } = require('ssh2');
 const fs = require('fs');
 
-// Fungsi untuk membaca file /etc/xray/config.json dan memeriksa username
+// Fungsi untuk membaca data admin
+const getAdmins = () => {
+    try {
+        return JSON.parse(fs.readFileSync('./admins.json'));
+    } catch (err) {
+        return [];
+    }
+};
+
+// Fungsi untuk update saldo admin
+const updateAdminBalance = (adminId, amount) => {
+    const admins = getAdmins();
+    const adminIndex = admins.findIndex(a => a.id === adminId);
+    
+    if (adminIndex !== -1) {
+        admins[adminIndex].balance = (admins[adminIndex].balance || 0) + amount;
+        fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        return true;
+    }
+    return false;
+};
+
+// Fungsi untuk mengirim laporan ke admin utama
+const sendReportToMainAdmin = async (bot, reportData) => {
+    const admins = getAdmins();
+    if (admins.length === 0) return;
+
+    const mainAdmin = admins[0];
+    const reportMessage = `
+📢 *Laporan Pembuatan Akun Baru* 📢
+
+👤 *Admin*: ${reportData.adminName} (ID: ${reportData.adminId})
+🖥️ *Server*: ${reportData.serverName}
+📛 *Username*: ${reportData.username}
+🔒 *Tipe*: Shadowsocks
+💰 *Harga*: Rp ${reportData.price.toLocaleString()}
+📅 *Waktu*: ${new Date().toLocaleString()}
+    `;
+
+    await bot.sendMessage(mainAdmin.id, reportMessage, { parse_mode: 'Markdown' });
+};
+
+// Fungsi untuk memeriksa username
 const checkUsernameExists = async (vpsHost, username, privateKeyPath) => {
     const conn = new Client();
+    let privateKey = fs.readFileSync(privateKeyPath, 'utf8');
 
-    // Baca file private key dari path
-    let privateKey;
-    try {
-        privateKey = fs.readFileSync(privateKeyPath, 'utf8'); // Baca file private key
-    } catch (error) {
-        console.error('Error reading private key file:', error.message);
-        throw new Error('❌ Gagal membaca file private key.');
-    }
-
-    // Konfigurasi SSH
     const sshConfig = {
-        host: vpsHost, // Host server
-        port: 22, // Port SSH (default: 22)
-        username: 'root', // Username SSH
-        privateKey: privateKey, // Private key yang dibaca dari file
+        host: vpsHost,
+        port: 22,
+        username: 'root',
+        privateKey: privateKey,
     };
 
-    // Perintah untuk membaca file /etc/xray/config.json
     const command = `cat /etc/xray/config.json | grep '"${username}"'`;
 
     return new Promise((resolve, reject) => {
         conn.on('ready', () => {
-            console.log('SSH connection established');
-            // Jalankan perintah di server
             conn.exec(command, (err, stream) => {
                 if (err) {
-                    console.error('Error executing command:', err.message);
                     conn.end();
                     return reject('❌ Gagal menjalankan perintah di server.');
                 }
@@ -41,29 +70,17 @@ const checkUsernameExists = async (vpsHost, username, privateKeyPath) => {
                     data += chunk;
                 });
 
-                stream.on('close', (code) => {
-                    console.log('Command executed with code:', code);
-                    console.log('Output:', data);
-
-                    // Tutup koneksi SSH
+                stream.on('close', () => {
                     conn.end();
-
-                    // Periksa apakah username ditemukan
-                    if (data.includes(username)) {
-                        resolve(true); // Username sudah ada
-                    } else {
-                        resolve(false); // Username belum ada
-                    }
+                    resolve(data.includes(username));
                 });
             });
         });
 
         conn.on('error', (err) => {
-            console.error('SSH connection error:', err.message);
             reject('❌ Gagal terhubung ke server.');
         });
 
-        // Hubungkan ke server
         conn.connect(sshConfig);
     });
 };
@@ -71,34 +88,21 @@ const checkUsernameExists = async (vpsHost, username, privateKeyPath) => {
 // Fungsi untuk membuat Shadowsocks
 const createShadowsocks = async (vpsHost, username, quota, ipLimit, activePeriod, domain, privateKeyPath) => {
     const conn = new Client();
+    let privateKey = fs.readFileSync(privateKeyPath, 'utf8');
 
-    // Baca file private key dari path
-    let privateKey;
-    try {
-        privateKey = fs.readFileSync(privateKeyPath, 'utf8'); // Baca file private key
-    } catch (error) {
-        console.error('Error reading private key file:', error.message);
-        throw new Error('❌ Gagal membaca file private key.');
-    }
-
-    // Konfigurasi SSH
     const sshConfig = {
-        host: vpsHost, // Host server
-        port: 22, // Port SSH (default: 22)
-        username: 'root', // Username SSH
-        privateKey: privateKey, // Private key yang dibaca dari file
+        host: vpsHost,
+        port: 22,
+        username: 'root',
+        privateKey: privateKey,
     };
 
-    // Perintah yang akan dijalankan di server
     const command = `createshadowsocks ${username} ${quota} ${ipLimit} ${activePeriod}`;
 
     return new Promise((resolve, reject) => {
         conn.on('ready', () => {
-            console.log('SSH connection established');
-            // Jalankan perintah di server
             conn.exec(command, (err, stream) => {
                 if (err) {
-                    console.error('Error executing command:', err.message);
                     conn.end();
                     return reject('❌ Gagal menjalankan perintah di server.');
                 }
@@ -108,20 +112,13 @@ const createShadowsocks = async (vpsHost, username, quota, ipLimit, activePeriod
                     data += chunk;
                 });
 
-                stream.on('close', (code) => {
-                    console.log('Command executed with code:', code);
-                    console.log('Output:', data);
-
-                    // Tutup koneksi SSH
+                stream.on('close', () => {
                     conn.end();
-
-                    // Parse output dari server
                     try {
-                        const ssData = JSON.parse(data); // Asumsikan output adalah JSON
-                        ssData.domain = domain; // Tambahkan domain ke data Shadowsocks
+                        const ssData = JSON.parse(data);
+                        ssData.domain = domain;
                         resolve(ssData);
-                    } catch (parseError) {
-                        console.error('Error parsing server output:', parseError.message);
+                    } catch (error) {
                         reject('❌ Gagal memproses output dari server.');
                     }
                 });
@@ -129,11 +126,9 @@ const createShadowsocks = async (vpsHost, username, quota, ipLimit, activePeriod
         });
 
         conn.on('error', (err) => {
-            console.error('SSH connection error:', err.message);
             reject('❌ Gagal terhubung ke server.');
         });
 
-        // Hubungkan ke server
         conn.connect(sshConfig);
     });
 };
@@ -171,71 +166,84 @@ module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const data = query.data;
+        const from = query.from;
 
         if (data.startsWith('ss_create_')) {
-            const serverIndex = data.split('_')[2]; // Ambil serverIndex dari callback data
-            const server = servers[serverIndex]; // Ambil server berdasarkan serverIndex
+            const serverIndex = data.split('_')[2];
+            const server = servers[serverIndex];
+            const domain = server.domain;
+            const privateKeyPath = server.privateKey;
+            const serverPrice = server.harga || 0;
 
-            // if (!server) {
-            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-            //     return;
-            // }
+            // Dapatkan data admin
+            const admins = getAdmins();
+            const admin = admins.find(a => a.id === from.id);
 
-            const domain = server.domain; // Ambil domain dari server
-            const privateKeyPath = server.privateKey; // Ambil path ke private key dari server
+            if (!admin) {
+                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!');
+                return;
+            }
 
-            // Minta input dari pengguna
+            // Cek saldo admin
+            if ((admin.balance || 0) < serverPrice) {
+                await bot.sendMessage(chatId, `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
+                return;
+            }
+
             await bot.sendMessage(chatId, 'Masukkan detail Shadow (format: username quota ip_limit masa_aktif):');
 
-            // Tangkap input pengguna
             const messageHandler = async (msg) => {
-                // Hapus listener setelah digunakan
                 bot.removeListener('message', messageHandler);
 
                 const input = msg.text.split(' ');
                 const [username, quota, ipLimit, activePeriod] = input;
 
-                // Validasi input
                 if (!username || !quota || !ipLimit || !activePeriod) {
                     await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
                     return;
                 }
 
                 try {
-                    // Periksa apakah username sudah ada
+                    // Cek username
                     const usernameExists = await checkUsernameExists(server.host, username, privateKeyPath);
-
                     if (usernameExists) {
-                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada. Silakan gunakan username lain.`);
+                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada.`);
                         return;
                     }
 
-                    // Panggil fungsi createShadowsocks
+                    // Buat akun Shadowsocks
                     const ssData = await createShadowsocks(server.host, username, quota, ipLimit, activePeriod, domain, privateKeyPath);
 
-                    // Hasilkan pesan Shadowsocks
-                    const message = generateShadowsocksMessage(ssData);
+                    // Update saldo admin
+                    updateAdminBalance(admin.id, -serverPrice);
 
-                    // Tambahkan tombol "Kembali ke Pemilihan Server"
+                    // Kirim laporan ke admin utama
+                    await sendReportToMainAdmin(bot, {
+                        adminId: admin.id,
+                        adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
+                        serverName: server.name,
+                        username: username,
+                        price: serverPrice
+                    });
+
+                    // Kirim hasil ke user
+                    const message = generateShadowsocksMessage(ssData);
                     const keyboard = {
                         inline_keyboard: [
-                            [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                            ],
+                            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
                         ],
                     };
 
-                    // Kirim pesan dengan tombol
                     await bot.sendMessage(chatId, message, {
                         parse_mode: 'Markdown',
                         reply_markup: keyboard,
                     });
+
                 } catch (error) {
                     await bot.sendMessage(chatId, error);
                 }
             };
 
-            // Gunakan listener sekali pakai
             bot.once('message', messageHandler);
         }
     });

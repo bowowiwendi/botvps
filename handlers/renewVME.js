@@ -1,56 +1,101 @@
 const { exec } = require('child_process');
+const fs = require('fs');
 
-// Fungsi untuk melihat daftar member SSH
-const viewVMEMembers = (vpsHost, callback) => {
-    // Validasi input
-    if (!vpsHost || typeof vpsHost !== 'string') {
-        callback('Error: VPS host tidak valid.');
-        return;
+// Fungsi untuk membaca data admin
+const getAdmins = () => {
+    try {
+        return JSON.parse(fs.readFileSync('./admins.json'));
+    } catch (err) {
+        return [];
     }
+};
 
-    const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl`;
+// Fungsi untuk update saldo admin
+const updateAdminBalance = (adminId, amount) => {
+    const admins = getAdmins();
+    const adminIndex = admins.findIndex(a => a.id === adminId);
+    
+    if (adminIndex !== -1) {
+        admins[adminIndex].balance = (admins[adminIndex].balance || 0) + amount;
+        fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        return true;
+    }
+    return false;
+};
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`Error: ${stderr}`);
-            return;
-        }
+// Fungsi untuk mengirim laporan ke admin utama
+const sendReportToMainAdmin = async (bot, reportData) => {
+    const admins = getAdmins();
+    if (admins.length === 0) return;
 
-        // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER VME* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
+    const mainAdmin = admins[0];
+    const reportMessage = `
+📢 *Laporan Renew Akun VMESS* 📢
 
-        callback(null, formattedOutput);
+👤 *Admin*: ${reportData.adminName} (ID: ${reportData.adminId})
+🖥️ *Server*: ${reportData.serverName}
+📛 *Username*: ${reportData.username}
+💰 *Harga*: Rp ${reportData.price.toLocaleString()}
+📅 *Waktu*: ${new Date().toLocaleString()}
+📝 *Detail*:
+- Masa Aktif: ${reportData.exp} hari
+- Quota: ${reportData.quota} GB
+- Limit IP: ${reportData.limitIp}
+    `;
+
+    await bot.sendMessage(mainAdmin.id, reportMessage, { parse_mode: 'Markdown' });
+};
+
+// Fungsi untuk melihat daftar member VMESS
+const viewVMEMembers = (vpsHost) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "cat /etc/xray/config.json | grep '^###' | cut -d ' ' -f 2-3 | sort | uniq | nl"`;
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal mengambil daftar member: ${stderr}`);
+                return;
+            }
+
+            const formattedOutput = `📋 *DAFTAR MEMBER VMESS* 📋\n\n` +
+                                  "```\n" +
+                                  stdout +
+                                  "\n```";
+            resolve(formattedOutput);
+        });
     });
 };
 
-// Fungsi untuk memeriksa apakah username ada di /etc/xray/config.json
-const checkUsernameExists = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
+// Fungsi untuk memeriksa username
+const checkUsernameExists = (vpsHost, username) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            // Jika username tidak ditemukan
-            callback(false);
-        } else {
-            // Jika username ditemukan
-            callback(true);
-        }
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                resolve(false);
+            } else {
+                resolve(true);
+            }
+        });
     });
 };
 
-// Fungsi untuk renew VMESS di VPS dengan quota dan limit IP
-const renewVME = (vpsHost, username, exp, quota, limitIp, callback) => {
-    const command = `printf "${username}\n${exp}\n${quota}\n${limitIp}" | ssh root@${vpsHost} renewws`;
+// Fungsi untuk renew VMESS
+const renewVME = (vpsHost, username, exp, quota, limitIp) => {
+    return new Promise((resolve, reject) => {
+        const command = `printf "${username}\n${exp}\n${quota}\n${limitIp}" | ssh root@${vpsHost} renewws`;
 
-    exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
-        callback(`✅ User \`${username}\` berhasil direnew:\n` +
-                 `- Masa Aktif: \`${exp}\` Hari\n` +
-                 `- Quota: \`${quota}\` GB\n` +
-                 `- Limit IP: \`${limitIp}\``);
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal renew akun: ${stderr}`);
+            } else {
+                resolve(`✅ User \`${username}\` berhasil direnew:
+- Masa Aktif: \`${exp}\` Hari
+- Quota: \`${quota}\` GB
+- Limit IP: \`${limitIp}\``);
+            }
+        });
     });
 };
 
@@ -58,76 +103,105 @@ module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const data = query.data;
+        const from = query.from;
 
         try {
             if (data.startsWith('vme_renew_')) {
                 const serverIndex = data.split('_')[2];
                 const server = servers[serverIndex];
+                const serverPrice = server.harga; // Menggunakan field harga
 
-                // Validasi server
-                if (!server) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                // Dapatkan data admin
+                const admins = getAdmins();
+                const admin = admins.find(a => a.id === from.id);
+
+                if (!admin) {
+                    await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!');
                     return;
                 }
 
-                // Tampilkan daftar VME terlebih dahulu
-                viewVMEMembers(server.host, (error, result) => {
-                    if (error) {
-                        bot.sendMessage(chatId, error);
+                // Cek saldo admin
+                if ((admin.balance || 0) < serverPrice) {
+                    await bot.sendMessage(chatId, 
+                        `❌ Saldo Anda tidak mencukupi! 
+Harga renew: Rp ${serverPrice.toLocaleString()}
+Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
+                    return;
+                }
+
+                // Tampilkan daftar VMESS
+                try {
+                    const listResult = await viewVMEMembers(server.host);
+                    await bot.sendMessage(chatId, listResult, {
+                        parse_mode: 'Markdown'
+                    });
+                } catch (error) {
+                    await bot.sendMessage(chatId, error);
+                    return;
+                }
+
+                // Minta input renew
+                await bot.sendMessage(chatId, 
+                    'Masukkan detail renew (format: username masa_aktif quota limit_ip):\n' +
+                    `Biaya: Rp ${serverPrice.toLocaleString()}`);
+
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
+                    const input = msg.text.split(' ');
+                    const [username, exp, quota, limitIp] = input;
+
+                    // Validasi input
+                    if (!username || !exp || isNaN(exp) || !quota || isNaN(quota) || !limitIp || isNaN(limitIp)) {
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
                         return;
                     }
 
-                    // Kirim daftar VME ke pengguna
-                    bot.sendMessage(chatId, result, {
-                        parse_mode: 'Markdown',
-                    }).then(() => {
-                        // Minta input username, masa aktif, quota, dan limit IP dari pengguna
-                        bot.sendMessage(chatId, 'Masukkan username, masa aktif (dalam hari), quota (dalam GB), dan limit IP (format: username masa_aktif quota limit_ip):');
+                    try {
+                        // Cek username
+                        const exists = await checkUsernameExists(server.host, username);
+                        if (!exists) {
+                            await bot.sendMessage(chatId, `❌ User \`${username}\` tidak ditemukan.`);
+                            return;
+                        }
 
-                        // Tangkap input pengguna
-                        bot.once('message', async (msg) => {
-                            const input = msg.text.split(' ');
-                            const [username, exp, quota, limitIp] = input;
+                        // Renew akun
+                        const result = await renewVME(server.host, username, exp, quota, limitIp);
 
-                            // Validasi input
-                            if (!username || !exp || isNaN(exp) || !quota || isNaN(quota) || !limitIp || isNaN(limitIp)) {
-                                await bot.sendMessage(chatId, 'Format input salah. Silakan masukkan username, masa aktif (dalam hari), quota (dalam GB), dan limit IP.');
-                                return;
-                            }
+                        // Update saldo admin
+                        updateAdminBalance(admin.id, -serverPrice);
 
-                            // Periksa apakah username ada di /etc/xray/config.json
-                            checkUsernameExists(server.host, username, (exists) => {
-                                if (!exists) {
-                                    // Jika username tidak ditemukan
-                                    bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada.`);
-                                    return;
-                                }
-
-                                // Jika username ditemukan, lanjutkan renew dengan quota dan limit IP
-                                renewVME(server.host, username, exp, quota, limitIp, (result) => {
-                                    // Tambahkan tombol "Kembali ke Menu Server"
-                                    const keyboard = {
-                                        inline_keyboard: [
-                                            [
-                                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                            ],
-                                        ],
-                                    };
-
-                                    // Kirim pesan hasil renew dengan tombol
-                                    bot.sendMessage(chatId, result, {
-                                        parse_mode: 'Markdown',
-                                        reply_markup: keyboard,
-                                    });
-                                });
-                            });
+                        // Kirim laporan ke admin utama
+                        await sendReportToMainAdmin(bot, {
+                            adminId: admin.id,
+                            adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
+                            serverName: server.name,
+                            username: username,
+                            price: serverPrice,
+                            exp: exp,
+                            quota: quota,
+                            limitIp: limitIp
                         });
-                    });
+
+                        // Kirim hasil ke user
+                        const keyboard = {
+                            inline_keyboard: [
+                                [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
+                            ],
+                        };
+
+                        await bot.sendMessage(chatId, result, {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard,
+                        });
+
+                    } catch (error) {
+                        await bot.sendMessage(chatId, error);
+                    }
                 });
             }
         } catch (error) {
             console.error('Error:', error);
-            await bot.sendMessage(chatId, 'Terjadi kesalahan internal. Silakan coba lagi.');
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
         }
     });
 };

@@ -1,5 +1,58 @@
 const { Client } = require('ssh2');
 const fs = require('fs');
+const moment = require('moment');
+
+// Baca file admins.json
+let admins = [];
+try {
+    admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
+} catch (error) {
+    console.error('Error reading admins file:', error.message);
+    // Default admin jika file tidak ada
+    admins = [
+        {
+            "id": 123456789,
+            "first_name": "Admin",
+            "last_name": "Utama",
+            "is_main": true
+        }
+    ];
+}
+
+// Simpan data limit trial dalam memory
+const trialLimits = new Map();
+
+// Fungsi untuk memeriksa apakah user adalah admin utama
+const isMainAdmin = (userId) => {
+    return admins.some(admin => admin.id === userId && admin.is_main === true);
+};
+
+// Fungsi untuk memeriksa limit trial pengguna
+const checkUserTrialLimit = (userId) => {
+    if (isMainAdmin(userId)) {
+        return { allowed: true, remaining: 'unlimited' }; // Admin utama tidak dibatasi
+    }
+
+    const now = moment();
+    const userData = trialLimits.get(userId) || { count: 0, firstRequest: now };
+
+    // Reset counter jika sudah lewat 1 minggu
+    if (now.diff(userData.firstRequest, 'days') >= 7) {
+        userData.count = 0;
+        userData.firstRequest = now;
+    }
+
+    if (userData.count >= 3) {
+        const nextReset = moment(userData.firstRequest).add(7, 'days');
+        const remainingTime = moment.duration(nextReset.diff(now)).humanize();
+        return { allowed: false, remaining: remainingTime };
+    }
+
+    userData.count += 1;
+    trialLimits.set(userId, userData);
+
+    return { allowed: true, remaining: 3 - userData.count };
+};
 
 // Fungsi untuk membuat Shadowsocks Trial
 const createShadowsocksTrial = async (vpsHost, username, domain, privateKeyPath) => {
@@ -8,7 +61,7 @@ const createShadowsocksTrial = async (vpsHost, username, domain, privateKeyPath)
     // Baca file private key dari path
     let privateKey;
     try {
-        privateKey = fs.readFileSync(privateKeyPath, 'utf8'); // Baca file private key
+        privateKey = fs.readFileSync(privateKeyPath, 'utf8');
     } catch (error) {
         console.error('Error reading private key file:', error.message);
         throw new Error('❌ Gagal membaca file private key.');
@@ -16,19 +69,16 @@ const createShadowsocksTrial = async (vpsHost, username, domain, privateKeyPath)
 
     // Konfigurasi SSH
     const sshConfig = {
-        host: vpsHost, // Host server
-        port: 22, // Port SSH (default: 22)
-        username: 'root', // Username SSH
-        privateKey: privateKey, // Private key yang dibaca dari file
+        host: vpsHost,
+        port: 22,
+        username: 'root',
+        privateKey: privateKey,
     };
 
-    // Perintah yang akan dijalankan di server (dengan batasan trial)
-    const command = `createshadowsocks ${username} 1 1 1`; // 1GB quota, 1 IP limit, 1 day active period
+    const command = `createshadowsocks ${username} 1 1 1`;
 
     return new Promise((resolve, reject) => {
         conn.on('ready', () => {
-            console.log('SSH connection established');
-            // Jalankan perintah di server
             conn.exec(command, (err, stream) => {
                 if (err) {
                     console.error('Error executing command:', err.message);
@@ -42,16 +92,10 @@ const createShadowsocksTrial = async (vpsHost, username, domain, privateKeyPath)
                 });
 
                 stream.on('close', (code) => {
-                    console.log('Command executed with code:', code);
-                    console.log('Output:', data);
-
-                    // Tutup koneksi SSH
                     conn.end();
-
-                    // Parse output dari server
                     try {
-                        const ssData = JSON.parse(data); // Asumsikan output adalah JSON
-                        ssData.domain = domain; // Tambahkan domain ke data Shadowsocks
+                        const ssData = JSON.parse(data);
+                        ssData.domain = domain;
                         resolve(ssData);
                     } catch (parseError) {
                         console.error('Error parsing server output:', parseError.message);
@@ -66,7 +110,6 @@ const createShadowsocksTrial = async (vpsHost, username, domain, privateKeyPath)
             reject('❌ Gagal terhubung ke server.');
         });
 
-        // Hubungkan ke server
         conn.connect(sshConfig);
     });
 };
@@ -100,40 +143,49 @@ Save Account Link: [Save Account](https://${ssData.domain}:81/shadowsocks-${ssDa
     `;
 };
 
-// Fungsi untuk menghasilkan username dengan format ShadowPrem(angka random)
 const generateShadowsocksUsername = () => {
-    const randomNumber = Math.floor(Math.random() * 1000) + 1; // Angka random antara 1 dan 1000
+    const randomNumber = Math.floor(Math.random() * 1000) + 1;
     return `ShadowPrem${randomNumber}`;
 };
 
 module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
+        const userId = query.from.id;
         const data = query.data;
 
         if (data.startsWith('ss_trial_')) {
-            const serverIndex = data.split('_')[2]; // Ambil serverIndex dari callback data
-            const server = servers[serverIndex]; // Ambil server berdasarkan serverIndex
+            const serverIndex = data.split('_')[2];
+            const server = servers[serverIndex];
 
             if (!server) {
                 await bot.sendMessage(chatId, 'Server tidak ditemukan.');
                 return;
             }
 
-            const domain = server.domain; // Ambil domain dari server
-            const privateKeyPath = server.privateKey; // Ambil path ke private key dari server
+            const limitCheck = checkUserTrialLimit(userId);
+            if (!limitCheck.allowed) {
+                await bot.sendMessage(
+                    chatId, 
+                    `❌ Anda telah mencapai batas maksimal trial (3 kali dalam 1 minggu).\n` +
+                    `Anda dapat membuat trial lagi dalam ${limitCheck.remaining}.`
+                );
+                return;
+            }
 
-            // Generate username secara otomatis
+            const domain = server.domain;
+            const privateKeyPath = server.privateKey;
             const username = generateShadowsocksUsername();
 
             try {
-                // Panggil fungsi createShadowsocksTrial
                 const ssData = await createShadowsocksTrial(server.host, username, domain, privateKeyPath);
-
-                // Hasilkan pesan Shadowsocks Trial
                 const message = generateShadowsocksTrialMessage(ssData);
+                
+                // Tambahkan info sisa trial hanya untuk non-admin
+                const remainingMessage = isMainAdmin(userId) 
+                    ? '\n✨ Anda adalah admin utama, tidak ada batasan trial.' 
+                    : `\nSisa trial yang tersedia: ${limitCheck.remaining} dari 3 kali dalam 1 minggu.`;
 
-                // Tambahkan tombol "Kembali ke Pemilihan Server"
                 const keyboard = {
                     inline_keyboard: [
                         [
@@ -142,8 +194,7 @@ module.exports = (bot, servers) => {
                     ],
                 };
 
-                // Kirim pesan dengan tombol
-                await bot.sendMessage(chatId, message, {
+                await bot.sendMessage(chatId, message + remainingMessage, {
                     parse_mode: 'Markdown',
                     reply_markup: keyboard,
                 });

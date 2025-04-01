@@ -17,6 +17,11 @@ module.exports = (bot, userState = {}) => {
         return admins.some(admin => admin.id === userId);
     };
 
+    const isMainAdmin = (userId) => {
+        const admins = getAdmins();
+        return admins.some(admin => admin.id === userId && admin.is_main === true);
+    };
+
     const admins = getAdmins();
     const firstAdmin = admins.length > 0 ? admins[0] : null;
 
@@ -27,7 +32,8 @@ module.exports = (bot, userState = {}) => {
 1. Tambah admin baru
 2. Hapus admin
 3. Lihat daftar admin
-4. Isi saldo admin`;
+4. Isi saldo admin
+5. Kelola admin utama`;
 
         const keyboard = {
             inline_keyboard: [
@@ -35,6 +41,7 @@ module.exports = (bot, userState = {}) => {
                 [{ text: '➖ Hapus Admin', callback_data: 'deladmin' }],
                 [{ text: '💳 Isi Saldo', callback_data: 'topup_admin' }],
                 [{ text: '📋 Daftar Admin', callback_data: 'listadmin' }],
+                [{ text: '👑 Admin Utama', callback_data: 'manage_main_admin' }],
                 [{ text: '🔙 Kembali', callback_data: 'back_to_start' }]
             ]
         };
@@ -45,13 +52,49 @@ module.exports = (bot, userState = {}) => {
         });
     };
 
+    // Fungsi untuk menampilkan daftar admin untuk pengaturan admin utama
+    const showAdminListForMainAdmin = (chatId) => {
+        const admins = getAdmins();
+        const keyboard = {
+            inline_keyboard: [
+                ...admins.map((admin, index) => [{
+                    text: `${admin.is_main ? '✅ ' : '❌ '} ${admin.name} (${admin.id})`,
+                    callback_data: `toggle_main_${index}`
+                }]),
+                [{ text: '🔙 Kembali', callback_data: 'menu_admin' }]
+            ]
+        };
+
+        bot.sendMessage(chatId, 'Pilih admin untuk dijadikan/singkirkan sebagai admin utama:', {
+            reply_markup: JSON.stringify(keyboard)
+        });
+    };
+
+    // Fungsi untuk toggle status admin utama
+    const toggleMainAdmin = (adminIndex) => {
+        const admins = getAdmins();
+        
+        // Jika admin ini akan dijadikan utama, reset semua status utama lainnya
+        if (!admins[adminIndex].is_main) {
+            admins.forEach(admin => {
+                admin.is_main = false;
+            });
+        }
+        
+        // Toggle status admin yang dipilih
+        admins[adminIndex].is_main = !admins[adminIndex].is_main;
+        saveAdmins(admins);
+        
+        return admins[adminIndex];
+    };
+
     // Fungsi untuk menampilkan daftar admin untuk topup
     const showAdminListForTopup = (chatId) => {
         const admins = getAdmins();
         const keyboard = {
             inline_keyboard: [
                 ...admins.map((admin, index) => [{
-                    text: `${admin.name} (Saldo: ${admin.saldo || 0})`,
+                    text: `${admin.name} (Saldo: ${admin.saldo || 0}) ${admin.is_main ? '👑' : ''}`,
                     callback_data: `select_admin_${index}`
                 }]),
                 [{ text: '🔙 Kembali', callback_data: 'menu_admin' }]
@@ -77,7 +120,7 @@ module.exports = (bot, userState = {}) => {
         }
 
         // Kirim notifikasi ke admin pertama (jika bukan diri sendiri)
-       
+        if (firstAdmin && firstAdmin.id !== msg.from.id) {
             try {
                 await bot.sendMessage(
                     firstAdmin.id,
@@ -99,6 +142,7 @@ module.exports = (bot, userState = {}) => {
                     })
                 });
             }
+        }
     };
 
     // Command handlers
@@ -155,7 +199,7 @@ module.exports = (bot, userState = {}) => {
 
                 case 'deladmin':
                     const deleteButtons = admins.map((admin, index) => [{
-                        text: `${admin.name} (@${admin.username || 'no-username'})`,
+                        text: `${admin.name} (@${admin.username || 'no-username'}) ${admin.is_main ? '👑' : ''}`,
                         callback_data: `delete_admin_${index}`
                     }]);
                     
@@ -170,7 +214,7 @@ module.exports = (bot, userState = {}) => {
 
                 case 'listadmin':
                     const adminButtons = admins.map(admin => [{
-                        text: `${admin.name} (@${admin.username || 'no-username'})`,
+                        text: `${admin.is_main ? '👑 ' : ''}${admin.name} (@${admin.username || 'no-username'})`,
                         callback_data: `admin_detail_${admin.id}`
                     }]);
                     
@@ -181,6 +225,39 @@ module.exports = (bot, userState = {}) => {
                         message_id: messageId,
                         reply_markup: { inline_keyboard: adminButtons }
                     });
+                    break;
+
+                case 'manage_main_admin':
+                    if (!isMainAdmin(userId)) {
+                        return bot.answerCallbackQuery(query.id, {
+                            text: 'Hanya admin utama yang bisa mengatur ini',
+                            show_alert: true
+                        });
+                    }
+                    showAdminListForMainAdmin(chatId);
+                    break;
+
+                case data.match(/^toggle_main_/)?.input:
+                    if (!isMainAdmin(userId)) {
+                        return bot.answerCallbackQuery(query.id, {
+                            text: 'Hanya admin utama yang bisa mengatur ini',
+                            show_alert: true
+                        });
+                    }
+                    
+                    const toggleIndex = parseInt(data.split('_')[2]);
+                    const toggledAdmin = toggleMainAdmin(toggleIndex);
+                    
+                    await bot.editMessageText(
+                        `Status admin utama untuk ${toggledAdmin.name} telah diubah menjadi ${toggledAdmin.is_main ? '✅ Aktif' : '❌ Nonaktif'}`,
+                        {
+                            chat_id: chatId,
+                            message_id: messageId,
+                            reply_markup: {
+                                inline_keyboard: [[{ text: '🔙 Kembali', callback_data: 'manage_main_admin' }]]
+                            }
+                        }
+                    );
                     break;
 
                 case data.match(/^admin_detail_/)?.input:
@@ -199,6 +276,7 @@ module.exports = (bot, userState = {}) => {
 Nama: ${detailAdmin.name}
 Username: @${detailAdmin.username || 'no-username'}
 ID: ${detailAdmin.id}
+Status: ${detailAdmin.is_main ? '👑 Admin Utama' : 'Admin Biasa'}
 Saldo: ${detailAdmin.saldo || 0}`;
                     
                     await bot.editMessageText(detailText, {
@@ -210,15 +288,19 @@ Saldo: ${detailAdmin.saldo || 0}`;
                                     text: '💳 Isi Saldo', 
                                     callback_data: `select_admin_${admins.findIndex(a => a.id === adminId)}` 
                                 }],
+                                isMainAdmin(userId) ? [{
+                                    text: detailAdmin.is_main ? '❌ Batalkan Admin Utama' : '👑 Jadikan Admin Utama',
+                                    callback_data: `toggle_main_${admins.findIndex(a => a.id === adminId)}`
+                                }] : [],
                                 [{ 
                                     text: '🗑️ Hapus Admin', 
                                     callback_data: `delete_admin_${admins.findIndex(a => a.id === adminId)}` 
                                 }],
                                 [{ 
-                                    text: '🔙 Kembali ke Daftar', 
+                                    text: '🔙 Kembali', 
                                     callback_data: 'listadmin' 
                                 }]
-                            ]
+                            ].filter(Boolean) // Hapus array kosong jika ada
                         }
                     });
                     break;
@@ -231,6 +313,15 @@ Saldo: ${detailAdmin.saldo || 0}`;
                     const deleteIndex = parseInt(data.split('_')[2]);
                     if (deleteIndex >= 0 && deleteIndex < admins.length) {
                         const deletedAdmin = admins[deleteIndex];
+                        
+                        // Cek jika admin yang dihapus adalah admin utama
+                        if (deletedAdmin.is_main) {
+                            return bot.answerCallbackQuery(query.id, {
+                                text: 'Tidak bisa menghapus admin utama!',
+                                show_alert: true
+                            });
+                        }
+                        
                         admins.splice(deleteIndex, 1);
                         await saveAdmins(admins);
                         
@@ -312,19 +403,24 @@ Saldo: ${detailAdmin.saldo || 0}`;
 
                 try {
                     const userInfo = await bot.getChat(newAdminId);
+                    const isFirstAdmin = admins.length === 0;
+                    
                     admins.push({
                         id: newAdminId,
                         username: userInfo.username,
                         name: userInfo.first_name || 'No Name',
-                        saldo: 0
+                        saldo: 0,
+                        is_main: isFirstAdmin // Jadikan admin utama jika ini admin pertama
                     });
+                    
                     await saveAdmins(admins);
                     
                     bot.sendMessage(chatId, 
                         `✅ Admin baru ditambahkan:\n\n` +
                         `Nama: ${userInfo.first_name}\n` +
                         `Username: @${userInfo.username || 'no-username'}\n` +
-                        `ID: ${newAdminId}`, {
+                        `ID: ${newAdminId}\n` +
+                        `Status: ${isFirstAdmin ? '👑 Admin Utama' : 'Admin Biasa'}`, {
                         reply_markup: JSON.stringify({
                             inline_keyboard: [[{ text: '🔙 Menu Admin', callback_data: 'menu_admin' }]]
                         })
@@ -354,11 +450,9 @@ Saldo: ${detailAdmin.saldo || 0}`;
                 await saveAdmins(admins);
 
                 await sendTopupNotifications({
-                    bot,
                     admin,
                     amount,
                     chatId,
-                    firstAdmin,
                     msg
                 });
 
@@ -383,6 +477,8 @@ Saldo: ${detailAdmin.saldo || 0}`;
     return {
         showAdminMenu,
         showAdminListForTopup,
-        sendTopupNotifications
+        sendTopupNotifications,
+        isMainAdmin,
+        getAdmins
     };
 };

@@ -8,13 +8,10 @@ module.exports = (bot) => {
         const keyboard = {
             inline_keyboard: [
                 [
-                    { text: '📋 Pilih Server', callback_data: 'list_servers' },
+                    { text: ' 🚀 Pilih Server', callback_data: 'list_servers' },
                 ],
                 [
-                    { text: '➕ Tambah Server', callback_data: 'add_server' },
-                ],
-                [
-                    { text: '❌ Hapus Server', callback_data: 'delete_server' },
+                    { text: '🖥️ Manage Server', callback_data: 'server' },
                 ],
                 [
                     { text: '👤 Manage Admin', callback_data: 'menu_admin' },
@@ -23,19 +20,19 @@ module.exports = (bot) => {
                     { text: '📢 Broadcast Pesan', callback_data: 'start_broadcast' },
                 ],
                 [
-                  { text: '⚙️ Edit QR & Caption (Admin)', callback_data: 'edit_topup_config' }
+                  { text: '⚙️ Edit QR & Caption', callback_data: 'edit_topup_config' }
                 ],
             ],
         };
+    
 
         const message = `
 Selamat Datang 
 di WENDI STORE New Bot! 🚀
 Anda dapat menggunakan tombol 
 di bawah untuk memilih perintah:
-- 📋 Pilih Server
+- 🚀 Pilih Server
 - ➕ Tambah Server
-- ❌ Hapus Server
 - 👤 Manage Admin
 - 📢 Broadcast
         `;
@@ -56,7 +53,7 @@ di bawah untuk memilih perintah:
         const isPrimaryAdmin = isAdmin && admins[0].id === userId;
 
         if (!isAdmin) {
-            return bot.sendMessage(chatId, `ID Anda: ${userId}\n\nJika ingin mendaftar, berikan ID ini ke @wendivpn`);
+            return bot.sendMessage(chatId, `ID Anda: ${userId}\n\nJika ingin mendaftar, Hubungi admin dan berikan ID ini ke @wendivpn`);
         }
 
         if (isPrimaryAdmin) {
