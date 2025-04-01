@@ -1,12 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const updateUserSaldo = (userId, amount) => {
+const updateUserBalance = (userId, amount) => {
   const data = getAdminData();
   const user = data.find(u => u.id.toString() === userId.toString());
   
   if (user) {
-    user.saldo += amount;
+    user.balance += amount;
     fs.writeFileSync(
       path.join(__dirname, '../admins.json'),
       JSON.stringify(data, null, 2)
@@ -15,7 +15,7 @@ const updateUserSaldo = (userId, amount) => {
   }
   return false;
 };
-// Fungsi untuk membaca data dari admins.json
+
 // Fungsi untuk membaca data dari admins.json
 const getAdminData = () => {
   try {
@@ -32,7 +32,7 @@ const findUser = (chatId) => {
   const adminData = getAdminData();
   return adminData.find(user => user.id.toString() === chatId.toString()) || { 
     name: 'User', 
-    saldo: 0,
+    balance: 0,
     username: 'Guest'
   };
 };
@@ -46,12 +46,12 @@ const showServerList = (bot, chatId, servers) => {
       callback_data: `select_server_${index}`,
     },
   ]);
-  keyboard.push([{ text: '💳 Topup', callback_data: 'topup_saldo' }]);
+  keyboard.push([{ text: '💳 Topup', callback_data: 'topup_balance' }]);
   
   const message = `
 👋 Selamat Datang, ${user.name} (@${user.username})!
 
-💰 Saldo Anda: Rp ${user.saldo.toLocaleString()}
+💰 Balance Anda: Rp ${user.balance.toLocaleString()}
 
 📌 WENDI STORE Bot 🚀
 Daftar Harga:
@@ -106,7 +106,7 @@ module.exports = (bot, servers) => {
       
       const message = `
 👋 Hai, ${user.name} (@${user.username})!
-💰 Saldo: Rp ${user.saldo.toLocaleString()}
+💰 Balance: Rp ${user.balance.toLocaleString()}
 
 📋 Keterangan Server:
 • Nama: ${server.name}
@@ -168,7 +168,7 @@ by @WENDIVPN`;
             
             const message = `
 👋 Hai, ${user.name} (@${user.username})!
-💰 Saldo: Rp ${user.saldo.toLocaleString()}
+💰 Balance: Rp ${user.balance.toLocaleString()}
 
 📋 Keterangan Server:
 • Nama: ${server.name}

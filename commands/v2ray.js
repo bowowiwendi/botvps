@@ -1,12 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const updateUserSaldo = (userId, amount) => {
+const updateUserBalance = (userId, amount) => {
   const data = getAdminData();
   const user = data.find(u => u.id.toString() === userId.toString());
   
   if (user) {
-    user.saldo += amount;
+    user.balance += amount;
     fs.writeFileSync(
       path.join(__dirname, '../admins.json'),
       JSON.stringify(data, null, 2)
@@ -31,7 +31,7 @@ const findUser = (chatId) => {
   const adminData = getAdminData();
   return adminData.find(user => user.id.toString() === chatId.toString()) || { 
     name: 'User', 
-    saldo: 0,
+    balance: 0,
     username: 'Guest'
   };
 };
@@ -92,7 +92,7 @@ module.exports = (bot, servers) => {
                 // Tampilkan Keterangan Server
                 const serverDescription = `
 👋 Hai, ${user.name} (@${user.username})!
-💰 Saldo: Rp ${user.saldo.toLocaleString()}
+💰 Balance: Rp ${user.balance.toLocaleString()}
 
 📋 Keterangan Server:
 • Nama: ${server.name}
@@ -158,7 +158,7 @@ by @WENDIVPN`;
                 
 const serverDescription = `
 👋 Hai, ${user.name} (@${user.username})!
-💰 Saldo: Rp ${user.saldo.toLocaleString()}
+💰 Balance: Rp ${user.balance.toLocaleString()}
 
 📋 Keterangan Server:
 • Nama: ${server.name}

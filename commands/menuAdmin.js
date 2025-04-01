@@ -32,14 +32,14 @@ module.exports = (bot, userState = {}) => {
 1. Tambah admin baru
 2. Hapus admin
 3. Lihat daftar admin
-4. Isi saldo admin
+4. Isi balance admin
 5. Kelola admin utama`;
 
         const keyboard = {
             inline_keyboard: [
                 [{ text: '➕ Tambah Admin', callback_data: 'addadmin' }],
                 [{ text: '➖ Hapus Admin', callback_data: 'deladmin' }],
-                [{ text: '💳 Isi Saldo', callback_data: 'topup_admin' }],
+                [{ text: '💳 Isi Balance', callback_data: 'topup_admin' }],
                 [{ text: '📋 Daftar Admin', callback_data: 'listadmin' }],
                 [{ text: '👑 Admin Utama', callback_data: 'manage_main_admin' }],
                 [{ text: '🔙 Kembali', callback_data: 'back_to_start' }]
@@ -94,7 +94,7 @@ module.exports = (bot, userState = {}) => {
         const keyboard = {
             inline_keyboard: [
                 ...admins.map((admin, index) => [{
-                    text: `${admin.name} (Saldo: ${admin.saldo || 0}) ${admin.is_main ? '👑' : ''}`,
+                    text: `${admin.name} (Balance: ${admin.balance || 0}) ${admin.is_main ? '👑' : ''}`,
                     callback_data: `select_admin_${index}`
                 }]),
                 [{ text: '🔙 Kembali', callback_data: 'menu_admin' }]
@@ -113,7 +113,7 @@ module.exports = (bot, userState = {}) => {
             await bot.sendMessage(
                 admin.id,
                 `💳 Anda menerima topup ${amount}\n` +
-                `Saldo baru: ${admin.saldo}`
+                `Balance baru: ${admin.balance}`
             );
         } catch (error) {
             console.log('Gagal mengirim notifikasi ke penerima');
@@ -128,7 +128,7 @@ module.exports = (bot, userState = {}) => {
                     `Admin pelaksana: ${msg.from.first_name} (ID: ${msg.from.id})\n` +
                     `Penerima: ${admin.name} (ID: ${admin.id})\n` +
                     `Jumlah: ${amount}\n` +
-                    `Saldo baru penerima: ${admin.saldo}\n\n` +
+                    `Balance baru penerima: ${admin.balance}\n\n` +
                     `Waktu: ${new Date().toLocaleString()}`
                 );
             } catch (error) {
@@ -277,7 +277,7 @@ Nama: ${detailAdmin.name}
 Username: @${detailAdmin.username || 'no-username'}
 ID: ${detailAdmin.id}
 Status: ${detailAdmin.is_main ? '👑 Admin Utama' : 'Admin Biasa'}
-Saldo: ${detailAdmin.saldo || 0}`;
+Balance: ${detailAdmin.balance || 0}`;
                     
                     await bot.editMessageText(detailText, {
                         chat_id: chatId,
@@ -285,7 +285,7 @@ Saldo: ${detailAdmin.saldo || 0}`;
                         reply_markup: {
                             inline_keyboard: [
                                 [{ 
-                                    text: '💳 Isi Saldo', 
+                                    text: '💳 Isi Balance', 
                                     callback_data: `select_admin_${admins.findIndex(a => a.id === adminId)}` 
                                 }],
                                 isMainAdmin(userId) ? [{
@@ -344,7 +344,7 @@ Saldo: ${detailAdmin.saldo || 0}`;
                         };
                         
                         await bot.editMessageText(
-                            `Masukkan jumlah saldo untuk ${admins[topupIndex].name}:\n\nContoh: 50000`, 
+                            `Masukkan jumlah balance untuk ${admins[topupIndex].name}:\n\nContoh: 50000`, 
                             {
                                 chat_id: chatId,
                                 message_id: messageId,
@@ -409,7 +409,7 @@ Saldo: ${detailAdmin.saldo || 0}`;
                         id: newAdminId,
                         username: userInfo.username,
                         name: userInfo.first_name || 'No Name',
-                        saldo: 0,
+                        balance: 0,
                         is_main: isFirstAdmin // Jadikan admin utama jika ini admin pertama
                     });
                     
@@ -446,7 +446,7 @@ Saldo: ${detailAdmin.saldo || 0}`;
                 const admins = getAdmins();
                 const admin = admins[state.adminIndex];
                 
-                admin.saldo = (admin.saldo || 0) + amount;
+                admin.balance = (admin.balance || 0) + amount;
                 await saveAdmins(admins);
 
                 await sendTopupNotifications({
