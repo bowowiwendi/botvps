@@ -28,7 +28,7 @@ const sendReportToMainAdmin = async (bot, reportData) => {
     const admins = getAdmins();
     if (admins.length === 0) return;
 
-    const mainAdmin = admins[0];
+    const mainAdmin = admins.find(a => a.is_main) || admins[0];
     const reportMessage = `
 📢 *Laporan Renew Akun SSH* 📢
 
@@ -44,6 +44,41 @@ const sendReportToMainAdmin = async (bot, reportData) => {
     await bot.sendMessage(mainAdmin.id, reportMessage, { parse_mode: 'Markdown' });
 };
 
+// Fungsi untuk melihat daftar member SSH
+const viewSSHMembers = (vpsHost) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "cat /etc/ssh/sshd_config | grep '^###' | cut -d ' ' -f 2-3 | sort | uniq | nl"`;
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal mengambil daftar member: ${stderr}`);
+                return;
+            }
+
+            const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
+                                  "```\n" +
+                                  stdout +
+                                  "\n```";
+            resolve(formattedOutput);
+        });
+    });
+};
+
+// Fungsi untuk memeriksa username SSH
+const checkSSHUsernameExists = (vpsHost, username) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "grep '${username}' /etc/ssh/sshd_config"`;
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                resolve(false);
+            } else {
+                resolve(true);
+            }
+        });
+    });
+};
+
 // Fungsi untuk renew SSH
 const renewSSH = (vpsHost, username, exp) => {
     return new Promise((resolve, reject) => {
@@ -51,9 +86,10 @@ const renewSSH = (vpsHost, username, exp) => {
 
         exec(command, (error, stdout, stderr) => {
             if (error) {
-                reject(`❌ Gagal renew user \`${username}\`. Error: ${stderr}`);
+                reject(`❌ Gagal renew akun: ${stderr}`);
             } else {
-                resolve(`✅ User \`${username}\` berhasil direnew \`${exp}\` Hari.`);
+                resolve(`✅ User \`${username}\` berhasil direnew:
+- Masa Aktif: \`${exp}\` Hari`);
             }
         });
     });
@@ -69,7 +105,7 @@ module.exports = (bot, servers) => {
             if (data.startsWith('renew_ssh_')) {
                 const serverIndex = data.split('_')[2];
                 const server = servers[serverIndex];
-                const serverPrice = server.harga; // Menggunakan field harga
+                const serverPrice = server.harga;
 
                 // Dapatkan data admin
                 const admins = getAdmins();
@@ -80,8 +116,11 @@ module.exports = (bot, servers) => {
                     return;
                 }
 
-                // Cek saldo admin
-                if ((admin.balance || 0) < serverPrice) {
+                // Cek apakah admin utama (tidak perlu bayar)
+                const isMainAdmin = admin.is_main === true;
+
+                // Cek saldo admin (kecuali admin utama)
+                if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
                     await bot.sendMessage(chatId, 
                         `❌ Saldo Anda tidak mencukupi! 
 Harga renew: Rp ${serverPrice.toLocaleString()}
@@ -89,40 +128,81 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                     return;
                 }
 
-                // Minta input renew
-                await bot.sendMessage(chatId, 
-                    'Masukkan username dan masa aktif (dalam hari) yang ingin direnew:\n' +
-                    'Format: username masa_aktif\n' +
-                    `Biaya: Rp ${serverPrice.toLocaleString()}`);
+                // Tampilkan daftar SSH terlebih dahulu
+                try {
+                    const listResult = await viewSSHMembers(server.host);
+                    await bot.sendMessage(chatId, listResult, {
+                        parse_mode: 'Markdown'
+                    });
+                } catch (error) {
+                    await bot.sendMessage(chatId, error);
+                    return;
+                }
+
+                // Pesan petunjuk berbeda untuk admin utama vs biasa
+                if (isMainAdmin) {
+                    await bot.sendMessage(chatId, 
+                        '🔷 Anda adalah ADMIN UTAMA (tidak dikenakan biaya)\n' +
+                        'Masukkan username dan masa aktif (dalam hari):\n' +
+                        'Format: username masa_aktif\n' +
+                        'Kosongkan masa aktif untuk default 30 hari');
+                } else {
+                    await bot.sendMessage(chatId, 
+                        'Masukkan username dan masa aktif (dalam hari):\n' +
+                        'Format: username masa_aktif\n' +
+                        `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
+                        'Default untuk admin biasa: 30 hari\n' +
+                        'Contoh: user1 30');
+                }
 
                 // Tangkap input pengguna
                 bot.once('message', async (msg) => {
                     if (msg.chat.id !== chatId || !msg.text || msg.text.startsWith('/')) return;
 
-                    const [username, exp] = msg.text.split(' ');
+                    let [username, exp] = msg.text.split(' ');
 
-                    // Validasi input
-                    if (!username || !exp || isNaN(exp)) {
-                        await bot.sendMessage(chatId, 'Format input salah. Contoh: user1 30');
+                    // Validasi username wajib diisi
+                    if (!username) {
+                        await bot.sendMessage(chatId, 'Username harus diisi!');
+                        return;
+                    }
+
+                    // Set default untuk admin biasa atau jika kosong
+                    exp = exp || '30';
+
+                    // Validasi input numerik
+                    if (isNaN(exp)) {
+                        await bot.sendMessage(chatId, 'Masa aktif harus berupa angka!');
                         return;
                     }
 
                     try {
+                        // Cek username terlebih dahulu
+                        const exists = await checkSSHUsernameExists(server.host, username);
+                        if (!exists) {
+                            await bot.sendMessage(chatId, `❌ User \`${username}\` tidak ditemukan.`);
+                            return;
+                        }
+
                         // Renew akun
                         const result = await renewSSH(server.host, username, exp);
 
-                        // Update saldo admin
-                        updateAdminBalance(admin.id, -serverPrice);
+                        // Update saldo admin (kecuali admin utama)
+                        if (!isMainAdmin) {
+                            updateAdminBalance(admin.id, -serverPrice);
+                        }
 
-                        // Kirim laporan ke admin utama
-                        await sendReportToMainAdmin(bot, {
-                            adminId: admin.id,
-                            adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
-                            serverName: server.name,
-                            username: username,
-                            price: serverPrice,
-                            exp: exp
-                        });
+                        // Kirim laporan ke admin utama (kecuali jika yang renew adalah admin utama)
+                        if (!isMainAdmin) {
+                            await sendReportToMainAdmin(bot, {
+                                adminId: admin.id,
+                                adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
+                                serverName: server.name,
+                                username: username,
+                                price: isMainAdmin ? 0 : serverPrice,
+                                exp: exp
+                            });
+                        }
 
                         // Kirim hasil ke user
                         const keyboard = {

@@ -4,7 +4,13 @@ const fs = require('fs');
 // Fungsi untuk membaca data admin
 const getAdmins = () => {
     try {
-        return JSON.parse(fs.readFileSync('./admins.json'));
+        const admins = JSON.parse(fs.readFileSync('./admins.json'));
+        // Ensure there's always a main admin
+        if (!admins.some(a => a.is_main)) {
+            admins[0].is_main = true;
+            fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        }
+        return admins;
     } catch (err) {
         return [];
     }
@@ -26,9 +32,9 @@ const updateAdminBalance = (adminId, amount) => {
 // Fungsi untuk mengirim laporan ke admin utama
 const sendReportToMainAdmin = async (bot, reportData) => {
     const admins = getAdmins();
-    if (admins.length === 0) return;
+    const mainAdmin = admins.find(a => a.is_main);
+    if (!mainAdmin) return;
 
-    const mainAdmin = admins[0];
     const reportMessage = `
 📢 *Laporan Pembuatan Akun Baru* 📢
 
@@ -36,7 +42,7 @@ const sendReportToMainAdmin = async (bot, reportData) => {
 🖥️ *Server*: ${reportData.serverName}
 📛 *Username*: ${reportData.username}
 🔒 *Tipe*: SSH
-💰 *Harga*: Rp ${reportData.price.toLocaleString()}
+💰 *Harga*: ${reportData.isMainAdmin ? 'GRATIS (Main Admin)' : 'Rp ' + reportData.price.toLocaleString()}
 📅 *Waktu*: ${new Date().toLocaleString()}
     `;
 
@@ -130,10 +136,10 @@ const generateSSHMessage = (sshData) => {
 └─────────────────────
 ┌─────────────────────
 │ *Domain*   : \`${sshData.domain}\`
-│ *Port TLS* : \`443\`
-│ *Port HTTP*: \`80\`
-│ *OpenSSH*  : \`22\`
-│ *UdpSSH*   : \`1-65535\`
+│ *Port TLS* : \`\`\`${sshData.domain:443@${sshData.username}:${sshData.password} \`\`\`
+│ *Port HTTP*: \`\`\`${sshData.domain:80@${sshData.username}:${sshData.password} \`\`\`
+│ *OpenSSH*  : \`\`\`${sshData.domain:22@${sshData.username}:${sshData.password} \`\`\`
+│ *UdpSSH*   : \`\`\`${sshData.domain:1-65535@${sshData.username}:${sshData.password} \`\`\`
 │ *DNS*      : \`443, 53, 22\`
 │ *Dropbear* : \`443, 109\`
 │ *SSH WS*   : \`80\`
@@ -181,21 +187,41 @@ module.exports = (bot, servers) => {
                 return;
             }
 
-            // Cek saldo admin
-            if ((admin.balance || 0) < serverPrice) {
+            const isMainAdmin = admin.is_main === true;
+            
+            // Cek saldo admin hanya jika bukan main admin
+            if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
                 await bot.sendMessage(chatId, `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                 return;
             }
 
-            await bot.sendMessage(chatId, 'Masukkan detail SSH (format: username password limit_device masa_aktif):');
+            if (isMainAdmin) {
+                await bot.sendMessage(chatId, 'Masukkan detail SSH (format: username password limit_device masa_aktif):');
+            } else {
+                await bot.sendMessage(chatId, 'Masukkan username dan password untuk SSH (limit: 2 device, masa aktif: 30 hari)\nFormat: username password');
+            }
 
             bot.once('message', async (msg) => {
-                const input = msg.text.split(' ');
-                const [username, password, limitDevice, activePeriod] = input;
-
-                if (!username || !password || !limitDevice || !activePeriod) {
-                    await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
-                    return;
+                let username, password, limitDevice, activePeriod;
+                
+                if (isMainAdmin) {
+                    const input = msg.text.split(' ');
+                    [username, password, limitDevice, activePeriod] = input;
+                    
+                    if (!username || !password || !limitDevice || !activePeriod) {
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                        return;
+                    }
+                } else {
+                    const input = msg.text.split(' ');
+                    [username, password] = input;
+                    limitDevice = '2';
+                    activePeriod = '30';
+                    
+                    if (!username || !password) {
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                        return;
+                    }
                 }
 
                 createSSH(server.host, username, password, limitDevice, activePeriod, privateKeyPath, async (error, sshData) => {
@@ -203,8 +229,10 @@ module.exports = (bot, servers) => {
                         return await bot.sendMessage(chatId, error.message);
                     }
 
-                    // Update saldo admin
-                    updateAdminBalance(admin.id, -serverPrice);
+                    // Update saldo admin hanya jika bukan main admin
+                    if (!isMainAdmin) {
+                        updateAdminBalance(admin.id, -serverPrice);
+                    }
 
                     // Kirim laporan ke admin utama
                     await sendReportToMainAdmin(bot, {
@@ -212,7 +240,8 @@ module.exports = (bot, servers) => {
                         adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
                         serverName: server.name,
                         username: username,
-                        price: serverPrice
+                        price: serverPrice,
+                        isMainAdmin: isMainAdmin
                     });
 
                     // Kirim hasil ke user

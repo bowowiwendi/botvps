@@ -37,14 +37,16 @@ const sendReportToMainAdmin = async (bot, reportData) => {
     const admins = getAdmins();
     if (admins.length === 0) return;
 
-    const mainAdmin = admins[0];
+    const mainAdmin = admins.find(a => a.is_main);
+    if (!mainAdmin) return;
+
     const reportMessage = `
 📢 *Laporan Pembuatan Akun Baru* 📢
 
 👤 *Admin*: ${reportData.adminName} (ID: ${reportData.adminId})
 🖥️ *Server*: ${reportData.serverName}
 📛 *Username*: ${reportData.username}
-💰 *Harga*: Rp ${reportData.price.toLocaleString()}
+💰 *Harga*: ${reportData.isMainAdmin ? 'GRATIS (Main Admin)' : 'Rp ' + reportData.price.toLocaleString()}
 📅 *Waktu*: ${new Date().toLocaleString()}
     `;
 
@@ -202,24 +204,34 @@ module.exports = (bot, servers) => {
                 return;
             }
 
-            // Cek saldo admin
-            if ((admin.balance || 0) < serverPrice) {
+            const isMainAdmin = admin.is_main === true;
+            
+            // Cek saldo admin hanya jika bukan main admin
+            if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
                 await bot.sendMessage(chatId, `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                 return;
             }
 
-            await bot.sendMessage(chatId, 'Masukkan detail VMESS (format: username quota ip_limit masa_aktif):');
+            if (isMainAdmin) {
+                await bot.sendMessage(chatId, 'Masukkan username untuk VMESS (format: username):');
+            } else {
+                await bot.sendMessage(chatId, 'Masukkan username untuk VMESS (quota: 1000GB, IP Limit: 2, Masa Aktif: 30 hari)\nFormat: username');
+            }
 
             const messageHandler = async (msg) => {
                 bot.removeListener('message', messageHandler);
 
-                const input = msg.text.split(' ');
-                const [username, quota, ipLimit, activePeriod] = input;
-
-                if (!username || !quota || !ipLimit || !activePeriod) {
-                    await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                const username = msg.text.trim();
+                
+                if (!username) {
+                    await bot.sendMessage(chatId, 'Username tidak boleh kosong. Silakan coba lagi.');
                     return;
                 }
+
+                // Set fixed values for non-main admins
+                const quota = isMainAdmin ? '0' : '1000';
+                const ipLimit = isMainAdmin ? '0' : '2';
+                const activePeriod = isMainAdmin ? '0' : '30';
 
                 try {
                     // Cek username
@@ -232,8 +244,10 @@ module.exports = (bot, servers) => {
                     // Buat VMESS
                     const vmessData = await createVmess(server.host, username, quota, ipLimit, activePeriod, domain, privateKeyPath);
 
-                    // Update saldo admin
-                    updateAdminBalance(admin.id, -serverPrice);
+                    // Update saldo admin hanya jika bukan main admin
+                    if (!isMainAdmin) {
+                        updateAdminBalance(admin.id, -serverPrice);
+                    }
 
                     // Kirim laporan ke admin utama
                     await sendReportToMainAdmin(bot, {
@@ -241,7 +255,8 @@ module.exports = (bot, servers) => {
                         adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
                         serverName: server.name,
                         username: username,
-                        price: serverPrice
+                        price: serverPrice,
+                        isMainAdmin: isMainAdmin
                     });
 
                     // Kirim hasil ke user

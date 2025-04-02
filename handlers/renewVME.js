@@ -28,7 +28,7 @@ const sendReportToMainAdmin = async (bot, reportData) => {
     const admins = getAdmins();
     if (admins.length === 0) return;
 
-    const mainAdmin = admins[0];
+    const mainAdmin = admins.find(a => a.is_main) || admins[0];
     const reportMessage = `
 📢 *Laporan Renew Akun VMESS* 📢
 
@@ -109,7 +109,7 @@ module.exports = (bot, servers) => {
             if (data.startsWith('vme_renew_')) {
                 const serverIndex = data.split('_')[2];
                 const server = servers[serverIndex];
-                const serverPrice = server.harga; // Menggunakan field harga
+                const serverPrice = server.harga;
 
                 // Dapatkan data admin
                 const admins = getAdmins();
@@ -120,8 +120,11 @@ module.exports = (bot, servers) => {
                     return;
                 }
 
-                // Cek saldo admin
-                if ((admin.balance || 0) < serverPrice) {
+                // Cek apakah admin utama (tidak perlu bayar)
+                const isMainAdmin = admin.is_main === true;
+
+                // Cek saldo admin (kecuali admin utama)
+                if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
                     await bot.sendMessage(chatId, 
                         `❌ Saldo Anda tidak mencukupi! 
 Harga renew: Rp ${serverPrice.toLocaleString()}
@@ -140,19 +143,46 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                     return;
                 }
 
-                // Minta input renew
-                await bot.sendMessage(chatId, 
-                    'Masukkan detail renew (format: username masa_aktif quota limit_ip):\n' +
-                    `Biaya: Rp ${serverPrice.toLocaleString()}`);
+                // Pesan petunjuk berbeda untuk admin utama vs biasa
+                if (isMainAdmin) {
+                    await bot.sendMessage(chatId, 
+                        '🔷 Anda adalah ADMIN UTAMA (tidak dikenakan biaya)\n' +
+                        'Masukkan detail renew (format: username masa_aktif quota limit_ip):\n' +
+                        'Kosongkan field untuk menggunakan default (contoh: username saja)');
+                } else {
+                    await bot.sendMessage(chatId, 
+                        'Masukkan detail renew (format: username masa_aktif quota limit_ip):\n' +
+                        `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
+                        'Default untuk admin biasa: 30 hari, 1000 GB, 2 IP\n' +
+                        'Contoh: username 30 1000 2');
+                }
 
                 // Tangkap input pengguna
                 bot.once('message', async (msg) => {
                     const input = msg.text.split(' ');
-                    const [username, exp, quota, limitIp] = input;
+                    let [username, exp, quota, limitIp] = input;
 
-                    // Validasi input
-                    if (!username || !exp || isNaN(exp) || !quota || isNaN(quota) || !limitIp || isNaN(limitIp)) {
-                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                    // Validasi username wajib diisi
+                    if (!username) {
+                        await bot.sendMessage(chatId, 'Username harus diisi!');
+                        return;
+                    }
+
+                    // Set default untuk admin biasa
+                    if (!isMainAdmin) {
+                        exp = exp || '30';
+                        quota = quota || '1000';
+                        limitIp = limitIp || '2';
+                    } else {
+                        // Admin utama bisa menentukan sendiri atau kosong untuk default
+                        exp = exp || '30';
+                        quota = quota || '0'; // 0 biasanya berarti unlimited
+                        limitIp = limitIp || '0'; // 0 biasanya berarti unlimited
+                    }
+
+                    // Validasi input numerik
+                    if (isNaN(exp) || isNaN(quota) || isNaN(limitIp)) {
+                        await bot.sendMessage(chatId, 'Masa aktif, quota, dan limit IP harus angka!');
                         return;
                     }
 
@@ -167,20 +197,24 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         // Renew akun
                         const result = await renewVME(server.host, username, exp, quota, limitIp);
 
-                        // Update saldo admin
-                        updateAdminBalance(admin.id, -serverPrice);
+                        // Update saldo admin (kecuali admin utama)
+                        if (!isMainAdmin) {
+                            updateAdminBalance(admin.id, -serverPrice);
+                        }
 
-                        // Kirim laporan ke admin utama
-                        await sendReportToMainAdmin(bot, {
-                            adminId: admin.id,
-                            adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
-                            serverName: server.name,
-                            username: username,
-                            price: serverPrice,
-                            exp: exp,
-                            quota: quota,
-                            limitIp: limitIp
-                        });
+                        // Kirim laporan ke admin utama (kecuali jika yang renew adalah admin utama)
+                        if (!isMainAdmin) {
+                            await sendReportToMainAdmin(bot, {
+                                adminId: admin.id,
+                                adminName: `${admin.first_name} ${admin.last_name || ''}`.trim(),
+                                serverName: server.name,
+                                username: username,
+                                price: isMainAdmin ? 0 : serverPrice,
+                                exp: exp,
+                                quota: quota,
+                                limitIp: limitIp
+                            });
+                        }
 
                         // Kirim hasil ke user
                         const keyboard = {

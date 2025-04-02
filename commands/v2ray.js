@@ -32,44 +32,64 @@ const findUser = (chatId) => {
   return adminData.find(user => user.id.toString() === chatId.toString()) || { 
     name: 'User', 
     balance: 0,
-    username: 'Guest'
+    username: 'Guest',
+    is_main: false
   };
 };
 
 module.exports = (bot, servers) => {
     // Fungsi untuk membuat submenu
-    const createSubMenu = (prefix, serverIndex) => {
-        return {
-            inline_keyboard: [
-                [
-                    { text: 'Create', callback_data: `${prefix}_create_${serverIndex}` },
+    const createSubMenu = (prefix, serverIndex, isMainUser) => {
+        if (isMainUser) {
+            return {
+                inline_keyboard: [
+                    [
+                        { text: 'Create', callback_data: `${prefix}_create_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Trial', callback_data: `${prefix}_trial_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Delete', callback_data: `${prefix}_delete_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'List', callback_data: `${prefix}_list_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Renew', callback_data: `${prefix}_renew_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Detail', callback_data: `${prefix}_detail_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Unlock', callback_data: `${prefix}_unlock_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Lock', callback_data: `${prefix}_lock_${serverIndex}` },
+                    ],
+                    [
+                        { text: '🔙 Kembali', callback_data: `v2ray_${serverIndex}` },
+                    ],
                 ],
-                [
-                    { text: 'Trial', callback_data: `${prefix}_trial_${serverIndex}` },
+            };
+        } else {
+            return {
+                inline_keyboard: [
+                    [
+                        { text: 'Create', callback_data: `${prefix}_create_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Trial', callback_data: `${prefix}_trial_${serverIndex}` },
+                    ],
+                    [
+                        { text: 'Renew', callback_data: `${prefix}_renew_${serverIndex}` },
+                    ],
+                    [
+                        { text: '🔙 Kembali', callback_data: `v2ray_${serverIndex}` },
+                    ],
                 ],
-                [
-                    { text: 'Delete', callback_data: `${prefix}_delete_${serverIndex}` },
-                ],
-                [
-                    { text: 'List', callback_data: `${prefix}_list_${serverIndex}` },
-                ],
-                [
-                    { text: 'Renew', callback_data: `${prefix}_renew_${serverIndex}` },
-                ],
-                [
-                    { text: 'Detail', callback_data: `${prefix}_detail_${serverIndex}` },
-                ],
-                [
-                    { text: 'Unlock', callback_data: `${prefix}_unlock_${serverIndex}` },
-                ],
-                [
-                    { text: 'Lock', callback_data: `${prefix}_lock_${serverIndex}` },
-                ],
-                [
-                    { text: '🔙 Kembali', callback_data: `v2ray_${serverIndex}` },
-                ],
-            ],
-        };
+            };
+        }
     };
 
     // Tangani callback query (tombol V2RAY)
@@ -156,7 +176,7 @@ by @WENDIVPN`;
                     return;
                 }
                 
-const serverDescription = `
+                const serverDescription = `
 👋 Hai, ${user.name} (@${user.username})!
 💰 Balance: Rp ${user.balance.toLocaleString()}
 
@@ -167,8 +187,8 @@ const serverDescription = `
 
 by @WENDIVPN
                 `;
-                // Tampilkan submenu sesuai prefix
-                const subMenu = createSubMenu(prefix, serverIndex);
+                // Tampilkan submenu sesuai prefix dan status user
+                const subMenu = createSubMenu(prefix, serverIndex, user.is_main);
 
                 await bot.sendMessage(chatId, serverDescription, {
                     reply_markup: subMenu,

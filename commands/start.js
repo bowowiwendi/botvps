@@ -32,7 +32,7 @@ di WENDI STORE New Bot! 🚀
 Anda dapat menggunakan tombol 
 di bawah untuk memilih perintah:
 - 🚀 Pilih Server
-- ➕ Tambah Server
+- 🖥 Manage Server
 - 👤 Manage Admin
 - 📢 Broadcast
         `;
