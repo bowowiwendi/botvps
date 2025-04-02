@@ -136,10 +136,10 @@ const generateSSHMessage = (sshData) => {
 └─────────────────────
 ┌─────────────────────
 │ *Domain*   : \`${sshData.domain}\`
-│ *Port TLS* : \`\`\`${sshData.domain:443@${sshData.username}:${sshData.password} \`\`\`
-│ *Port HTTP*: \`\`\`${sshData.domain:80@${sshData.username}:${sshData.password} \`\`\`
-│ *OpenSSH*  : \`\`\`${sshData.domain:22@${sshData.username}:${sshData.password} \`\`\`
-│ *UdpSSH*   : \`\`\`${sshData.domain:1-65535@${sshData.username}:${sshData.password} \`\`\`
+│ *Port TLS* : \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
+│ *Port HTTP*: \`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
+│ *OpenSSH*  : \`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
+│ *UdpSSH*   : \`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
 │ *DNS*      : \`443, 53, 22\`
 │ *Dropbear* : \`443, 109\`
 │ *SSH WS*   : \`80\`
