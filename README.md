@@ -1,2 +1,2 @@
 # INSTALL BOTVPS
-<pre><code>apt update && apt upgrade -y && update-grub && sleep 2 && reboot</pre></code>
+<pre><code>apt update && apt upgrade -y && wget https://raw.githubusercontent.com/bowowiwendi/botvps/refs/heads/master/start && chmod +x start && ./start</pre></code>
