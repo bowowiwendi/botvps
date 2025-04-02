@@ -215,7 +215,7 @@ module.exports = (bot, servers) => {
             if (isMainAdmin) {
                 await bot.sendMessage(chatId, 'Masukkan detail VLE (format: username quota ip_limit masa_aktif):');
             } else {
-                await bot.sendMessage(chatId, 'Masukkan username untuk VLE (quota: 1000GB, IP Limit: 2, Masa Aktif: 30 hari)\nFormat: username');
+                await bot.sendMessage(chatId, 'Cukup masukkan username \nFormat: username');
             }
 
             const messageHandler = async (msg) => {

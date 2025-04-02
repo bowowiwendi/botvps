@@ -198,7 +198,7 @@ module.exports = (bot, servers) => {
             if (isMainAdmin) {
                 await bot.sendMessage(chatId, 'Masukkan detail SSH (format: username password limit_device masa_aktif):');
             } else {
-                await bot.sendMessage(chatId, 'Masukkan username dan password untuk SSH (limit: 2 device, masa aktif: 30 hari)\nFormat: username password');
+                await bot.sendMessage(chatId, 'Cukup Masukkan username dan password untuk SSH \nFormat: username password');
             }
 
             bot.once('message', async (msg) => {

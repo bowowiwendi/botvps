@@ -151,9 +151,9 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         'Kosongkan field untuk menggunakan default (contoh: username saja)');
                 } else {
                     await bot.sendMessage(chatId, 
-                        'Masukkan detail renew (format: username masa_aktif quota limit_ip):\n' +
+                        'Masukkan username renew (format: username:\n' +
                         `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
-                        'Default untuk admin biasa: 30 hari, 1000 GB, 2 IP\n' +
+                        'Default untuk user biasa: 30 hari, 1000 GB, 2 IP\n' +
                         'Contoh: username 30 1000 2');
                 }
 

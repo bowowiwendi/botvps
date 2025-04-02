@@ -148,8 +148,8 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         'Kosongkan masa aktif untuk default 30 hari');
                 } else {
                     await bot.sendMessage(chatId, 
-                        'Masukkan username dan masa aktif (dalam hari):\n' +
-                        'Format: username masa_aktif\n' +
+                        'Masukkan username:\n' +
+                        'Format: username\n' +
                         `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
                         'Default untuk admin biasa: 30 hari\n' +
                         'Contoh: user1 30');

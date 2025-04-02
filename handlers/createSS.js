@@ -201,7 +201,7 @@ module.exports = (bot, servers) => {
             if (isMainAdmin) {
                 await bot.sendMessage(chatId, 'Masukkan detail Shadow (format: username quota ip_limit masa_aktif):');
             } else {
-                await bot.sendMessage(chatId, 'Masukkan username untuk Shadow (quota: 1000GB, IP Limit: 2, Masa Aktif: 30 hari)\nFormat: username');
+                await bot.sendMessage(chatId, 'Cukup Masukkan username \nFormat: username');
             }
 
             const messageHandler = async (msg) => {

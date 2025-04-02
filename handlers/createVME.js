@@ -213,9 +213,9 @@ module.exports = (bot, servers) => {
             }
 
             if (isMainAdmin) {
-                await bot.sendMessage(chatId, 'Masukkan username untuk VMESS (format: username):');
+                await bot.sendMessage(chatId, 'Masukkan username untuk VMESS (format: username Quota ip_limit expired):');
             } else {
-                await bot.sendMessage(chatId, 'Masukkan username untuk VMESS (quota: 1000GB, IP Limit: 2, Masa Aktif: 30 hari)\nFormat: username');
+                await bot.sendMessage(chatId, 'Cukup Masukkan username \nFormat: username');
             }
 
             const messageHandler = async (msg) => {

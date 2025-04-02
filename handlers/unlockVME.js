@@ -23,7 +23,7 @@ const checkUserLocked = (vpsHost, username, callback) => {
 };
 // Fungsi untuk membuka kunci akun
 const unlockVME = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "unlock-vm '${username}'"`;
+    const command = `printf "${username}" | ssh root@${vpsHost} unlock-vm`;
     
     exec(command, (error, stdout, stderr) => {
         if (error) {

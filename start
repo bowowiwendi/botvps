@@ -1,0 +1,77 @@
+#!/bin/bash
+DOMAIN=$(cat /etc/xray/domain)
+
+# Update package list
+echo -e "\033[1;36mMemperbarui daftar package...\033[0m"
+sudo apt update -y
+
+# Install git, npm, dan pm2 secara global
+echo -e "\033[1;36mMenginstall git, npm, dan pm2...\033[0m"
+sudo apt install -y git npm
+sudo npm install -g pm2
+
+# Clone repository bot
+echo -e "\033[1;36mMengclone repository bot...\033[0m"
+if [ -d "botvps" ]; then
+    echo "Directory botvps sudah ada. Melakukan update..."
+    cd botvps
+    git pull
+else
+    git clone https://github.com/bowowiwendi/botvps.git
+    cd botvps
+fi
+
+# Install dependencies
+echo -e "\033[1;36mMenginstall dependencies...\033[0m"
+npm install ssh2 dotenv moment
+
+# Konfigurasi
+echo -e "\033[1;33mSilakan masukkan konfigurasi yang diperlukan:\033[0m"
+
+# Masukkan token bot ke .env
+read -p "Masukkan token bot Telegram: " token
+echo "TOKEN=$token" > .env
+
+# Masukkan ID admin ke admin.json
+read -p "Masukkan ID Telegram admin (pisahkan dengan koma jika banyak): " admin_ids
+echo '[{
+    "id": '$admin_ids',
+    "username": "AdminUtama",
+    "name": "Utama",
+    "balance": "Unlimited",
+    "is_main": true
+}]' > admins.json
+
+# Masukkan IP server ke server.json
+echo '[{
+    "name": "SERVER LOKAL",
+    "host": "127.0.0.1",
+    "port": 22,
+    "username": "root",
+    "privateKey": "/root/.ssh/id_rsa",
+    "domain": "'$DOMAIN'",
+    "harga": "10000"
+}]' > servers.json
+
+# Jalankan bot menggunakan PM2
+echo -e "\033[1;36mMenjalankan bot menggunakan PM2...\033[0m"
+pm2 start bot.js --name "botvps"
+
+# Simpan konfigurasi PM2 untuk restart otomatis
+echo -e "\033[1;36mMenyimpan konfigurasi PM2...\033[0m"
+pm2 save
+
+# Buat startup script PM2 saat reboot
+echo -e "\033[1;36mMembuat startup script PM2...\033[0m"
+pm2 startup
+
+# Informasi
+echo -e "\033[1;32mInstalasi selesai!\033[0m"
+echo -e "\033[1;33mBot telah berjalan di PM2 dan akan otomatis restart saat sistem reboot.\033[0m"
+echo ""
+echo -e "\033[1;34mPerintah yang berguna:\033[0m"
+echo "1. Melihat status bot: pm2 status"
+echo "2. Melihat log bot: pm2 logs botvps"
+echo "3. Restart bot: pm2 restart botvps"
+echo "4. Stop bot: pm2 stop botvps"
+echo "5. Menghapus bot dari PM2: pm2 delete botvps"
