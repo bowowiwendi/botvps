@@ -44,6 +44,7 @@ Pilih aksi yang ingin dilakukan:
 - Regist: Registrasi AutoScript.
 - Gen Link: Generate link Backup.
 - Info VPS: Lihat informasi VPS.
+- Commen : Perintah Ke Vps
 by @WENDIVPN
 `;
 

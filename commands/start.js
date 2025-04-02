@@ -35,6 +35,7 @@ di bawah untuk memilih perintah:
 - 🖥 Manage Server
 - 👤 Manage Admin
 - 📢 Broadcast
+- 💳 QR CODE EDIT
         `;
 
         bot.sendMessage(chatId, message, {

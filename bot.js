@@ -57,6 +57,7 @@ const deletIP = require('./commands/deletIP');
 const listIP = require('./commands/listIP');
 const renewIP = require('./commands/renewIP');
 const manageDetail = require('./commands/manageDetail');
+const cmd = require('./commands/cmd');
 const Topup = require('./Topup');
 const broadcast = require('./broadcast');// Import modul broadcast
 
@@ -146,6 +147,7 @@ const commands = [
     { command: menuRegist, params: [bot, servers] },
     { command: Topup, params: [bot, servers] },
    { command: manageDetail, params: [bot, servers] },
+   { command: cmd, params: [bot, servers] },
 ];
 commands.forEach(cmd => {
     try {
