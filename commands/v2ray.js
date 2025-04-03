@@ -196,7 +196,7 @@ by @WENDIVPN
             }
         } catch (error) {
             console.error('Terjadi kesalahan:', error);
-            await bot.sendMessage(chatId, 'Terjadi kesalahan saat memproses permintaan Anda.');
+            await bot.sendMessage(chatId, 'Memproses permintaan Anda.');
         }
     });
 };

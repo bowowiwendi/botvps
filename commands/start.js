@@ -54,7 +54,7 @@ di bawah untuk memilih perintah:
         const isPrimaryAdmin = isAdmin && admins[0].id === userId;
 
         if (!isAdmin) {
-            return bot.sendMessage(chatId, `ID Anda: ${userId}\n\nJika ingin mendaftar, Hubungi admin dan berikan ID ini ke @wendivpn`);
+            return bot.sendMessage(chatId, `ID Anda: \`${userId}\` \n\nJika ingin mendaftar, Hubungi admin dan berikan ID ini ke @wendivpn`);
         }
 
         if (isPrimaryAdmin) {
