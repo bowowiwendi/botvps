@@ -38,7 +38,7 @@ echo '[{
     "id": '$admin_ids',
     "username": "AdminUtama",
     "name": "Utama",
-    "balance": "1000000",
+    "balance": "0",
     "is_main": true
 }]' > admins.json
 
@@ -55,7 +55,7 @@ echo '[{
 
 # Jalankan bot menggunakan PM2
 echo -e "\033[1;36mMenjalankan bot menggunakan PM2...\033[0m"
-pm2 start bot.js --name "botvps"
+pm2 start index.js --name "bot"
 
 # Simpan konfigurasi PM2 untuk restart otomatis
 echo -e "\033[1;36mMenyimpan konfigurasi PM2...\033[0m"
