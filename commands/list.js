@@ -44,7 +44,7 @@ const showServerList = (bot, chatId, servers) => {
   const keyboard = servers.map((server, index) => [
     {
       text: server.name,
-      callback_data: `select_server_${index}`,
+      callback_data: `select_${index}`,
     },
   ]);
   
@@ -96,8 +96,8 @@ module.exports = (bot, servers) => {
     const data = query.data;
     const user = findUser(chatId);
 
-    if (data.startsWith('select_server_')) {
-      const serverIndex = data.split('_')[2];
+    if (data.startsWith('select_')) {
+      const serverIndex = data.split('_')[1];
       const server = servers[serverIndex];
 
       // if (!server) {

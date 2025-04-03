@@ -115,6 +115,10 @@ const generateTrojanTrialMessage = (trojanData) => {
 \`\`\`
 ${trojanData.trojan_tls_link}
 \`\`\`
+🔓 *URL TROJ non-TLS (80)*
+\`\`\`
+${trojanData.trojan_nontls_link}
+\`\`\`
 🔒 *URL TROJ GRPC*
 \`\`\`
 ${trojanData.trojan_grpc_link}

@@ -28,6 +28,17 @@ const updateAdminBalance = (adminId, amount) => {
     }
     return false;
 };
+const addToMainAdminBalance = (amount) => {
+       const admins = getAdmins();
+       const mainAdmin = admins.find(a => a.is_main);
+       
+       if (mainAdmin) {
+           mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+           fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+           return true;
+       }
+       return false;
+   };
 
 // Fungsi untuk mengirim laporan ke admin utama
 const sendReportToMainAdmin = async (bot, reportData) => {
@@ -242,7 +253,10 @@ module.exports = (bot, servers) => {
 
                     // Update saldo admin hanya jika bukan main admin
                     if (!isMainAdmin) {
+                        // Kurangi saldo admin yang membuat
                         updateAdminBalance(admin.id, -serverPrice);
+                        // Tambahkan saldo ke admin utama
+                        addToMainAdminBalance(serverPrice);
                     }
 
                     // Kirim laporan ke admin utama

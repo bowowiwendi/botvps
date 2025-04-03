@@ -32,6 +32,19 @@ const updateAdminBalance = (adminId, amount) => {
     return false;
 };
 
+// Fungsi untuk menambahkan saldo ke admin utama
+const addToMainAdminBalance = (amount) => {
+    const admins = getAdmins();
+    const mainAdmin = admins.find(a => a.is_main);
+    
+    if (mainAdmin) {
+        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+        fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        return true;
+    }
+    return false;
+};
+
 // Fungsi untuk mengirim laporan ke admin utama
 const sendReportToMainAdmin = async (bot, reportData) => {
     const admins = getAdmins();
@@ -128,6 +141,10 @@ const createTrojan = async (vpsHost, username, quota, ipLimit, activePeriod, dom
                     try {
                         const trojanData = JSON.parse(data);
                         trojanData.domain = domain;
+                        
+                        // Tambahkan link non-TLS
+                        trojanData.trojan_nontls_link = `trojan://${trojanData.password}@${domain}:80?path=%2Ftrojan-ws&security=none&host=${domain}&type=ws#${username}`;
+                        
                         resolve(trojanData);
                     } catch (error) {
                         reject('❌ Gagal memproses output dari server.');
@@ -154,16 +171,21 @@ const generateTrojanMessage = (trojanData) => {
 │ *Username* : \`${trojanData.username}\`
 │ *Domain*   : \`${trojanData.domain}\`
 │ *Port TLS* : \`443\`
+│ *Port non-TLS* : \`80\`
 │ *Password* : \`${trojanData.password}\`
-│ *Network*  : \`TCP\`
-│ *Path*     : \`/trojan\`
+│ *Network*  : \`WS\`
+│ *Path*     : \`/trojan-ws\`
 │ *Path GRPC*: \`trojan-grpc\`
 └─────────────────────
-🔐 *URL TROJ TLS*
+🔐 *URL TROJ TLS (443)*
 \`\`\`
 ${trojanData.trojan_tls_link}
 \`\`\`
-🔒 *URL TROJ GRPC*
+🔓 *URL TROJ non-TLS (80)*
+\`\`\`
+${trojanData.trojan_nontls_link}
+\`\`\`
+🔒 *URL TROJ GRPC (443)*
 \`\`\`
 ${trojanData.trojan_grpc_link}
 \`\`\`
@@ -210,7 +232,7 @@ module.exports = (bot, servers) => {
             if (isMainAdmin) {
                 await bot.sendMessage(chatId, 'Masukkan detail Troj (format: username quota ip_limit masa_aktif):');
             } else {
-                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, IP \nFormat: username');
+                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, IP: 2, Masa aktif: 30 hari)\nFormat: username');
             }
 
             const messageHandler = async (msg) => {
@@ -249,9 +271,12 @@ module.exports = (bot, servers) => {
                     // Buat akun Trojan
                     const trojanData = await createTrojan(server.host, username, quota, ipLimit, activePeriod, domain, privateKeyPath);
 
-                    // Update saldo admin hanya jika bukan main admin
+                    // Update saldo admin
                     if (!isMainAdmin) {
+                        // Kurangi saldo admin yang membuat
                         updateAdminBalance(admin.id, -serverPrice);
+                        // Tambahkan saldo ke admin utama
+                        addToMainAdminBalance(serverPrice);
                     }
 
                     // Kirim laporan ke admin utama
