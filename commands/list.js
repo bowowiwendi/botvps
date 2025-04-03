@@ -100,10 +100,10 @@ module.exports = (bot, servers) => {
       const serverIndex = data.split('_')[2];
       const server = servers[serverIndex];
 
-      if (!server) {
-        await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-        return;
-      }
+      // if (!server) {
+      //   await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+      //   return;
+      // }
 
       // Create different keyboard based on user status
       let keyboard;
@@ -147,10 +147,10 @@ by @WENDIVPN`;
       const serverIndex = data.split('_')[1];
       const server = servers[serverIndex];
 
-      if (!server) {
-        await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-        return;
-      }
+      // if (!server) {
+      //   await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+      //   return;
+      // }
 
       // Hapus pesan lama
       await bot.deleteMessage(chatId, messageId);

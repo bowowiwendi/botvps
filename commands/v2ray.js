@@ -104,10 +104,10 @@ module.exports = (bot, servers) => {
                 const serverIndex = data.split('_')[1];
                 const server = servers[serverIndex];
 
-                if (!server) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                    return;
-                }
+                // if (!server) {
+                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                //     return;
+                // }
 
                 // Tampilkan Keterangan Server
                 const serverDescription = `
@@ -171,10 +171,10 @@ by @WENDIVPN`;
                 const [prefix, serverIndex] = data.split('_');
                 const server = servers[serverIndex];
 
-                if (!server) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                    return;
-                }
+                // if (!server) {
+                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                //     return;
+                // }
                 
                 const serverDescription = `
 👋 Hai, ${user.name} (@${user.username})!
