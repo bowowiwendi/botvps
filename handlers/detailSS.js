@@ -74,10 +74,10 @@ module.exports = (bot, servers) => {
                 const server = servers[serverIndex];
 
                 // Validasi server
-                if (!server) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                    return;
-                }
+                // if (!server) {
+                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                //     return;
+                // }
 
                 // Tampilkan daftar Shadowsocks terlebih dahulu
                 const listResult = await viewSSMembers(server.host);

@@ -38,7 +38,7 @@ echo '[{
     "id": '$admin_ids',
     "username": "AdminUtama",
     "name": "Utama",
-    "balance": "Unlimited",
+    "balance": "1000000",
     "is_main": true
 }]' > admins.json
 

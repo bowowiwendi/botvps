@@ -6,7 +6,7 @@
 TARGET_DIR="botvps"
 BACKUP_DIR="/tmp/botvpn_backup"
 REPO_URL="https://github.com/bowowiwendi/botvps.git"  # Ganti dengan repo Anda
-PM2_APP_NAME="botvps"  # Ganti dengan nama app PM2 Anda
+PM2_APP_NAME="bot"  # Ganti dengan nama app PM2 Anda
 
 # Fungsi untuk menangani error
 handle_error() {

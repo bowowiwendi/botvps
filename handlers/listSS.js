@@ -36,14 +36,13 @@ module.exports = (bot, servers) => {
         try {
             if (data.startsWith('ss_list_')) {
                 const serverIndex = data.split('_')[2];
-
-                // Validasi serverIndex
-                if (isNaN(serverIndex) || serverIndex < 0 || serverIndex >= servers.length) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                    return;
-                }
-
                 const server = servers[serverIndex];
+
+                // // Validasi serverIndex
+                // if (isNaN(serverIndex) || serverIndex < 0 || serverIndex >= servers.length) {
+                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                //     return;
+                // }
 
                 // Panggil fungsi viewSSMembers
                 const result = await viewSSMembers(server.host);

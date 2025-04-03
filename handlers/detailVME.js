@@ -57,10 +57,10 @@ module.exports = (bot, servers) => {
                 const server = servers[serverIndex];
 
                 // Validasi server
-                if (!server) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                    return;
-                }
+                // if (!server) {
+                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                //     return;
+                // }
 
                 // Tampilkan daftar VME terlebih dahulu
                 viewVMEMembers(server.host, (error, result) => {

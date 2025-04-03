@@ -84,10 +84,10 @@ const generateSSHMessage = (sshData) => {
 └─────────────────────
 ┌─────────────────────
 │ *Domain*   : \`${sshData.domain}\`
-│ *Port TLS* : \`443\`
-│ *Port HTTP*: \`80\`
-│ *OpenSSH*  : \`22\`
-│ *UdpSSH*   : \`1-65535\`
+│ *Port TLS* : \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
+│ *Port HTTP*: \`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
+│ *OpenSSH*  : \`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
+│ *UdpSSH*   : \`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
 │ *DNS*      : \`443, 53, 22\`
 │ *Dropbear* : \`443, 109\`
 │ *SSH WS*   : \`80\`
@@ -130,10 +130,10 @@ module.exports = (bot, servers) => {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
 
-            if (!server) {
-                await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
-                return;
-            }
+            // if (!server) {
+            //     await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
+            //     return;
+            // }
 
             // Dapatkan data admin
             const admins = getAdmins();

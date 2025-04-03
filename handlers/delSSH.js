@@ -36,10 +36,10 @@ module.exports = (bot, servers) => {
                 const server = servers[serverIndex];
 
                 // Validasi server
-                if (!server) {
-                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                    return;
-                }
+                // if (!server) {
+                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                //     return;
+                // }
 
                 // Minta input username dari pengguna setelah menampilkan daftar
                 await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dihapus:');

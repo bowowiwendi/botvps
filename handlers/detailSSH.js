@@ -42,10 +42,10 @@ module.exports = (bot, servers) => {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
 
-            if (!server) {
-                await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                return;
-            }
+            // if (!server) {
+            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+            //     return;
+            // }
 
             await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dilihat detailnya:');
 
