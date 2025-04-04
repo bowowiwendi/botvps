@@ -7,8 +7,8 @@ sudo apt update -y
 
 # Install git, npm, dan pm2 secara global
 echo -e "\033[1;36mMenginstall git, npm, dan pm2...\033[0m"
+sudo apt install nodejs
 sudo apt install -y git npm
-sudo npm install -g pm2
 
 # Clone repository bot
 echo -e "\033[1;36mMengclone repository bot...\033[0m"
@@ -30,10 +30,10 @@ echo -e "\033[1;33mSilakan masukkan konfigurasi yang diperlukan:\033[0m"
 
 # Masukkan token bot ke .env
 read -p "Masukkan token bot Telegram: " token
-echo "TOKEN=$token" > .env
+echo "TELEGRAM_BOT_TOKEN=$token" > .env
 
 # Masukkan ID admin ke admin.json
-read -p "Masukkan ID Telegram admin (pisahkan dengan koma jika banyak): " admin_ids
+read -p "Masukkan ID Telegram admin Utama : " admin_ids
 echo '[{
     "id": '$admin_ids',
     "username": "AdminUtama",
@@ -71,7 +71,7 @@ echo -e "\033[1;33mBot telah berjalan di PM2 dan akan otomatis restart saat sist
 echo ""
 echo -e "\033[1;34mPerintah yang berguna:\033[0m"
 echo "1. Melihat status bot: pm2 status"
-echo "2. Melihat log bot: pm2 logs botvps"
-echo "3. Restart bot: pm2 restart botvps"
-echo "4. Stop bot: pm2 stop botvps"
-echo "5. Menghapus bot dari PM2: pm2 delete botvps"
+echo "2. Melihat log bot: pm2 logs bot"
+echo "3. Restart bot: pm2 restart bot"
+echo "4. Stop bot: pm2 stop bot"
+echo "5. Menghapus bot dari PM2: pm2 delete bot"
