@@ -1,6 +1,40 @@
 const fs = require('fs');
 const path = require('path');
 
+// Fungsi untuk membaca/menyimpan welcome message
+const getWelcomeMessage = () => {
+  try {
+    const data = fs.readFileSync(path.join(__dirname, '../welcome_message.json'), 'utf8');
+    return data || defaultWelcomeMessage;
+  } catch (err) {
+    return defaultWelcomeMessage;
+  }
+};
+
+const saveWelcomeMessage = (message) => {
+  fs.writeFileSync(
+    path.join(__dirname, '../welcome_message.json'),
+    message
+  );
+};
+
+const defaultWelcomeMessage = `
+👋 Selamat Datang, {name} (@{username})!
+
+💰 Balance Anda: Rp {balance}
+
+📌 WENDI STORE Bot 🚀
+Daftar Harga:
+- Server SG Perbulan/10k 2 Devices
+- Server SG Perbulan/15k STB
+- Server ID Perbulan/15k 2 Devices
+- Server ID Perbulan/20k STB
+
+Nb: SG/Singapore, ID/Indonesia
+by @WENDIVPN
+
+Pilih server:`;
+
 const updateUserBalance = (userId, amount) => {
   const data = getAdminData();
   const user = data.find(u => u.id.toString() === userId.toString());
@@ -40,6 +74,7 @@ const findUser = (chatId) => {
 
 const showServerList = (bot, chatId, servers) => {
   const user = findUser(chatId);
+  const welcomeMessage = getWelcomeMessage();
   
   const keyboard = servers.map((server, index) => [
     {
@@ -53,29 +88,19 @@ const showServerList = (bot, chatId, servers) => {
   
   // Add Edit Welcome Message button only for main admins
   if (user.is_main) {
-    keyboard.push([{ text: '✏️ Edit Welcome Message', callback_data: 'edit_welcome_message' }],
-      [{ text: '🔙 Kembali',
-      callback_data: 'back_to_start' }]);
+    keyboard.push(
+      [{ text: '✏️ Edit Welcome Message', callback_data: 'edit_welcome_message' }],
+      [{ text: '🔙 Kembali', callback_data: 'back_to_start' }]
+    );
   }
   
-  let message = `
-👋 Selamat Datang, ${user.name} (@${user.username})!
+  // Replace placeholders in the message
+  const formattedMessage = welcomeMessage
+    .replace(/{name}/g, user.name)
+    .replace(/{username}/g, user.username)
+    .replace(/{balance}/g, user.balance.toLocaleString());
 
-💰 Balance Anda: Rp ${user.balance.toLocaleString()}
-
-📌 WENDI STORE Bot 🚀
-Daftar Harga:
-- Server SG Perbulan/10k 2 Devices
-- Server SG Perbulan/15k STB
-- Server ID Perbulan/15k 2 Devices
-- Server ID Perbulan/20k STB
-
-Nb: SG/Singapore, ID/Indonesia
-by @WENDIVPN
-
-Pilih server:`;
-
-  bot.sendMessage(chatId, message, {
+  bot.sendMessage(chatId, formattedMessage, {
     reply_markup: {
       inline_keyboard: keyboard,
     },
@@ -99,11 +124,6 @@ module.exports = (bot, servers) => {
     if (data.startsWith('select_server_')) {
       const serverIndex = data.split('_')[2];
       const server = servers[serverIndex];
-
-      // if (!server) {
-      //   await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-      //   return;
-      // }
 
       // Create different keyboard based on user status
       let keyboard;
@@ -146,11 +166,6 @@ by @WENDIVPN`;
     } else if (data.startsWith('ssh_')) {
       const serverIndex = data.split('_')[1];
       const server = servers[serverIndex];
-
-      // if (!server) {
-      //   await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-      //   return;
-      // }
 
       // Hapus pesan lama
       await bot.deleteMessage(chatId, messageId);
@@ -224,11 +239,14 @@ by @WENDIVPN`;
     } else if (data === 'list_servers') {
       // Hapus pesan lama
       await bot.deleteMessage(chatId, messageId);
-      showServerList(bot, chatId, servers, user);
+      showServerList(bot, chatId, servers);
     } else if (data === 'edit_welcome_message') {
       // Only allow main admins to edit welcome message
       if (!user.is_main) {
-        await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Hanya admin utama yang dapat mengedit pesan selamat datang.', show_alert: true });
+        await bot.answerCallbackQuery(query.id, { 
+          text: 'Akses ditolak! Hanya admin utama yang dapat mengedit pesan selamat datang.', 
+          show_alert: true 
+        });
         return;
       }
       
@@ -236,43 +254,27 @@ by @WENDIVPN`;
       await bot.deleteMessage(chatId, messageId);
       
       // Send message with current welcome message and edit options
-      const currentMessage = `Ini adalah pesan selamat datang saat ini:\n\n${message}\n\nSilakan kirim pesan baru untuk menggantinya.`;
+      const currentMessage = `Ini adalah pesan selamat datang saat ini:\n\n${getWelcomeMessage()}\n\nSilakan kirim pesan baru untuk menggantinya. Gunakan {name}, {username}, dan {balance} sebagai placeholder.`;
       
       await bot.sendMessage(chatId, currentMessage, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🔙 Kembali', callback_data: 'list_servers' }]
+            [{ text: '🔙 Batalkan', callback_data: 'list_servers' }]
           ]
         }
       });
       
-      // Set up message listener for the new welcome message
-      bot.once('message', async (msg) => {
+      // Set up listener untuk pesan baru
+      const messageListener = async (msg) => {
         if (msg.chat.id === chatId && !msg.text.startsWith('/')) {
-          // Save the new welcome message (you'll need to implement this storage)
-          welcomeMessage = msg.text;
+          bot.removeListener('message', messageListener);
+          saveWelcomeMessage(msg.text);
           await bot.sendMessage(chatId, 'Pesan selamat datang telah diperbarui!');
           showServerList(bot, chatId, servers);
         }
-      });
+      };
+      
+      bot.on('message', messageListener);
     }
   });
-  
-  // Variable to store welcome message (you might want to store this in a file/database)
-  let welcomeMessage = `
-👋 Selamat Datang, {name} (@{username})!
-
-💰 Balance Anda: Rp {balance}
-
-📌 WENDI STORE Bot 🚀
-Daftar Harga:
-- Server SG Perbulan/10k 2 Devices
-- Server SG Perbulan/15k STB
-- Server ID Perbulan/15k 2 Devices
-- Server ID Perbulan/20k STB
-
-Nb: SG/Singapore, ID/Indonesia
-by @WENDIVPN
-
-Pilih server:`;
 };
