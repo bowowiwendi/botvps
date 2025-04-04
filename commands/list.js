@@ -44,7 +44,7 @@ const showServerList = (bot, chatId, servers) => {
   const keyboard = servers.map((server, index) => [
     {
       text: server.name,
-      callback_data: `select_${index}`,
+      callback_data: `select_server_${index}`,
     },
   ]);
   
@@ -58,7 +58,7 @@ const showServerList = (bot, chatId, servers) => {
       callback_data: 'back_to_start' }]);
   }
   
-  const message = `
+  let message = `
 👋 Selamat Datang, ${user.name} (@${user.username})!
 
 💰 Balance Anda: Rp ${user.balance.toLocaleString()}
@@ -96,8 +96,8 @@ module.exports = (bot, servers) => {
     const data = query.data;
     const user = findUser(chatId);
 
-    if (data.startsWith('select_')) {
-      const serverIndex = data.split('_')[1];
+    if (data.startsWith('select_server_')) {
+      const serverIndex = data.split('_')[2];
       const server = servers[serverIndex];
 
       // if (!server) {
@@ -236,7 +236,7 @@ by @WENDIVPN`;
       await bot.deleteMessage(chatId, messageId);
       
       // Send message with current welcome message and edit options
-      const currentMessage = `Ini adalah pesan selamat datang saat ini:\n\n${welcomeMessage}\n\nSilakan kirim pesan baru untuk menggantinya.`;
+      const currentMessage = `Ini adalah pesan selamat datang saat ini:\n\n${message}\n\nSilakan kirim pesan baru untuk menggantinya.`;
       
       await bot.sendMessage(chatId, currentMessage, {
         reply_markup: {
