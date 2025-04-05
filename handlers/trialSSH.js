@@ -84,10 +84,14 @@ const generateSSHMessage = (sshData) => {
 └─────────────────────
 ┌─────────────────────
 │ *Domain*   : \`${sshData.domain}\`
-│ *Port TLS* : \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
-│ *Port HTTP*: \`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
-│ *OpenSSH*  : \`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
-│ *UdpSSH*   : \`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
+│ *Port TLS* : 
+│ \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
+│ *Port HTTP*: 
+│\`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
+│ *OpenSSH*  : 
+│\`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
+│ *UdpSSH*   : 
+│\`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
 │ *DNS*      : \`443, 53, 22\`
 │ *Dropbear* : \`443, 109\`
 │ *SSH WS*   : \`80\`
@@ -130,11 +134,6 @@ module.exports = (bot, servers) => {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
 
-            // if (!server) {
-            //     await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
-            //     return;
-            // }
-
             // Dapatkan data admin
             const admins = getAdmins();
             const isMainAdmin = admins.some(a => a.id === from.id && a.is_main);
@@ -142,8 +141,16 @@ module.exports = (bot, servers) => {
             // Jika bukan admin utama, cek trial limit
             if (!isMainAdmin) {
                 if (!checkTrialLimit(from.id)) {
+                    const keyboard = {
+                        inline_keyboard: [
+                            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
+                        ],
+                    };
+                    
                     return await bot.sendMessage(chatId, 
-                        '❌ Anda sudah mencapai batas trial mingguan (3 trial per minggu).');
+                        '❌ Anda sudah mencapai batas trial mingguan (3 trial per minggu).', {
+                        reply_markup: keyboard
+                    });
                 }
             }
 
@@ -176,7 +183,15 @@ module.exports = (bot, servers) => {
                 });
 
             } catch (error) {
-                await bot.sendMessage(chatId, error);
+                const keyboard = {
+                    inline_keyboard: [
+                        [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
+                    ],
+                };
+                
+                await bot.sendMessage(chatId, error, {
+                    reply_markup: keyboard
+                });
             }
         }
     });

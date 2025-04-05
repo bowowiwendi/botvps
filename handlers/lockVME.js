@@ -16,7 +16,7 @@ const viewVMEMembers = (vpsHost, callback) => {
         }
 
         // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER VME* 📋\n\n` +
+        const formattedOutput = `📋 *DAFTAR MEMBER VMESS* 📋\n\n` +
                               "```\n" +
                               stdout +
                               "\n```";
@@ -59,23 +59,32 @@ module.exports = (bot, servers) => {
         if (data.startsWith('vme_lock_')) {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
-
-            // if (!server) {
-            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-            //     return;
-            // }
+            
+            // Tombol kembali yang konsisten
+            const backButton = {
+                inline_keyboard: [
+                    [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+                ]
+            };
 
             // Tampilkan daftar member terlebih dahulu
             viewVMEMembers(server.host, async (error, result) => {
                 if (error) {
-                    await bot.sendMessage(chatId, error);
+                    await bot.sendMessage(chatId, error, {
+                        reply_markup: backButton
+                    });
                     return;
                 }
 
-                await bot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+                await bot.sendMessage(chatId, result, { 
+                    parse_mode: 'Markdown',
+                    reply_markup: backButton
+                });
 
                 // Minta input username dari pengguna
-                await bot.sendMessage(chatId, 'Masukkan username VMESS yang ingin dikunci:');
+                await bot.sendMessage(chatId, 'Masukkan username VMESS yang ingin dikunci:', {
+                    reply_markup: backButton
+                });
 
                 // Gunakan ID unik untuk listener
                 const listenerId = `vme_lock_${chatId}_${Date.now()}`;
@@ -87,34 +96,30 @@ module.exports = (bot, servers) => {
                     const username = msg.text.trim();
 
                     if (!username) {
-                        await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
+                            reply_markup: backButton
+                        });
                         return;
                     }
 
                     // Periksa apakah username ada di /etc/xray/config.json
                     checkUsernameExists(server.host, username, async (exists) => {
                         if (!exists) {
-                            await bot.sendMessage(chatId, `❌ User \`${username}\` tidak ditemukan.`, {
-                                parse_mode: 'Markdown'
-                            });
+                            await bot.sendMessage(chatId, 
+                                `❌ User \`${username}\` tidak ditemukan.`, 
+                                {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: backButton
+                                }
+                            );
                             return;
                         }
 
                         // Jika username ditemukan, lanjutkan proses mengunci
                         lockVME(server.host, username, async (result) => {
-                            // Tambahkan tombol "Kembali ke Menu Server"
-                            const keyboard = {
-                                inline_keyboard: [
-                                    [
-                                        { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                    ],
-                                ],
-                            };
-
-                            // Kirim pesan hasil penguncian dengan tombol
                             await bot.sendMessage(chatId, result, {
                                 parse_mode: 'Markdown',
-                                reply_markup: keyboard,
+                                reply_markup: backButton
                             });
                         });
                     });

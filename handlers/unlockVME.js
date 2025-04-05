@@ -21,6 +21,7 @@ const checkUserLocked = (vpsHost, username, callback) => {
         callback(!error && stdout.trim() !== '');
     });
 };
+
 // Fungsi untuk membuka kunci akun
 const unlockVME = (vpsHost, username, callback) => {
     const command = `printf "${username}" | ssh root@${vpsHost} unlock-vm`;
@@ -41,25 +42,16 @@ module.exports = (bot, servers) => {
         const serverIndex = data.split('_')[2];
         const server = servers[serverIndex];
 
-        // if (!server) {
-        //     await bot.sendMessage(chatId, '❌ Server tidak ditemukan', {
-        //         reply_markup: {
-        //             inline_keyboard: [
-        //                 [{ text: '🔙 Kembali', callback_data: 'main_menu' }]
-        //             ]
-        //         }
-        //     });
-        //     return;
-        // }
-
         if (data.startsWith('vme_unlock_')) {
-            getLockedAccounts(server.host, async (accounts) => {
-                const backButton = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
-                    ]
-                };
+            // Tombol kembali yang konsisten
+            const backButton = {
+                inline_keyboard: [
+                    [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+                ]
+            };
 
+            // Langkah 1: Tampilkan daftar akun terkunci terlebih dahulu
+            getLockedAccounts(server.host, async (accounts) => {
                 if (accounts.length === 0) {
                     await bot.sendMessage(chatId, '🔓 Tidak ada akun yang terkunci', {
                         reply_markup: backButton
@@ -67,14 +59,25 @@ module.exports = (bot, servers) => {
                     return;
                 }
 
+                // Kirim daftar akun terkunci sebagai pesan terpisah
                 await bot.sendMessage(chatId, 
-                    `🔒 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\`\nMasukkan username:`, 
-                    { parse_mode: 'Markdown' }
+                    `📋 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``, 
+                    { 
+                        parse_mode: 'Markdown',
+                        reply_markup: backButton
+                    }
                 );
 
-                const listenerId = `unlock_${chatId}_${Date.now()}`;
-                
-                bot.once(listenerId, async (msg) => {
+                // Langkah 2: Minta input username
+                await bot.sendMessage(chatId, 
+                    '🔓 Masukkan username yang ingin dibuka kuncinya:',
+                    { 
+                        reply_markup: backButton
+                    }
+                );
+
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
                     if (msg.chat.id !== chatId) return;
                     
                     const username = msg.text.trim();
@@ -86,10 +89,11 @@ module.exports = (bot, servers) => {
                         return;
                     }
 
+                    // Langkah 3: Verifikasi akun terkunci
                     checkUserLocked(server.host, username, async (isLocked) => {
                         if (!isLocked) {
                             await bot.sendMessage(chatId, 
-                                `❌ User \`${username}\` tidak terkunci`, 
+                                `❌ User \`${username}\` tidak ditemukan dalam daftar terkunci`, 
                                 { 
                                     parse_mode: 'Markdown',
                                     reply_markup: backButton 
@@ -98,6 +102,7 @@ module.exports = (bot, servers) => {
                             return;
                         }
 
+                        // Langkah 4: Proses membuka kunci
                         unlockVME(server.host, username, async (result) => {
                             await bot.sendMessage(chatId, result, {
                                 parse_mode: 'Markdown',
@@ -105,12 +110,6 @@ module.exports = (bot, servers) => {
                             });
                         });
                     });
-                });
-
-                bot.on('message', (msg) => {
-                    if (msg.text && msg.chat.id === chatId) {
-                        bot.emit(listenerId, msg);
-                    }
                 });
             });
         }

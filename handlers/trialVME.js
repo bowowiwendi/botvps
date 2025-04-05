@@ -141,6 +141,15 @@ const generateVmessUsername = () => {
     return `VmessPrem${randomNumber}`;
 };
 
+// Fungsi untuk membuat keyboard kembali
+const createBackKeyboard = (serverIndex) => {
+    return {
+        inline_keyboard: [
+            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+        ]
+    };
+};
+
 module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
@@ -150,11 +159,7 @@ module.exports = (bot, servers) => {
         if (data.startsWith('vme_trial_')) {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
-
-            // if (!server) {
-            //     await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
-            //     return;
-            // }
+            const backKeyboard = createBackKeyboard(serverIndex);
 
             // Dapatkan data admin
             const admins = getAdmins();
@@ -164,7 +169,9 @@ module.exports = (bot, servers) => {
             if (!isMainAdmin) {
                 if (!checkTrialLimit(from.id)) {
                     return await bot.sendMessage(chatId, 
-                        '❌ Anda sudah mencapai batas trial mingguan (3 trial per minggu).');
+                        '❌ Anda sudah mencapai batas trial mingguan (3 trial per minggu).',
+                        { reply_markup: backKeyboard }
+                    );
                 }
             }
 
@@ -183,19 +190,16 @@ module.exports = (bot, servers) => {
 
                 // Hasilkan pesan
                 const message = generateVmessTrialMessage(vmessData);
-                const keyboard = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
-                    ],
-                };
-
+                
                 await bot.sendMessage(chatId, message, {
                     parse_mode: 'Markdown',
-                    reply_markup: keyboard,
+                    reply_markup: backKeyboard,
                 });
 
             } catch (error) {
-                await bot.sendMessage(chatId, error);
+                await bot.sendMessage(chatId, error, {
+                    reply_markup: backKeyboard
+                });
             }
         }
     });

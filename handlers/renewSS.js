@@ -11,16 +11,17 @@ const getAdmins = () => {
 };
 
 const addToMainAdminBalance = (amount) => {
-       const admins = getAdmins();
-       const mainAdmin = admins.find(a => a.is_main);
-       
-       if (mainAdmin) {
-           mainAdmin.balance = (mainAdmin.balance || 0) + amount;
-           fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
-           return true;
-       }
-       return false;
-   };
+    const admins = getAdmins();
+    const mainAdmin = admins.find(a => a.is_main);
+    
+    if (mainAdmin) {
+        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+        fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        return true;
+    }
+    return false;
+};
+
 // Fungsi untuk update saldo admin
 const updateAdminBalance = (adminId, amount) => {
     const admins = getAdmins();
@@ -201,7 +202,15 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         // Cek username
                         const exists = await checkUsernameExists(server.host, username);
                         if (!exists) {
-                            await bot.sendMessage(chatId, `❌ User \`${username}\` tidak ditemukan.`);
+                            const keyboard = {
+                                inline_keyboard: [
+                                    [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
+                                ],
+                            };
+                            await bot.sendMessage(chatId, `❌ User \`${username}\` tidak ditemukan.`, {
+                                parse_mode: 'Markdown',
+                                reply_markup: keyboard
+                            });
                             return;
                         }
 
@@ -210,11 +219,11 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
 
                         // Update saldo admin (kecuali admin utama)
                         if (!isMainAdmin) {
-                        // Kurangi saldo admin yang membuat
-                        updateAdminBalance(admin.id, -serverPrice);
-                        // Tambahkan saldo ke admin utama
-                        addToMainAdminBalance(serverPrice);
-                    }
+                            // Kurangi saldo admin yang membuat
+                            updateAdminBalance(admin.id, -serverPrice);
+                            // Tambahkan saldo ke admin utama
+                            addToMainAdminBalance(serverPrice);
+                        }
 
                         // Kirim laporan ke admin utama (kecuali jika yang renew adalah admin utama)
                         if (!isMainAdmin) {

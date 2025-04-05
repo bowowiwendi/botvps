@@ -64,10 +64,10 @@ module.exports = (bot, servers) => {
                 const server = servers[serverIndex];
 
                 // Validasi server
-                // if (!server) {
-                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                //     return;
-                // }
+                if (!server) {
+                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                    return;
+                }
 
                 // Tampilkan daftar Shadowsocks terlebih dahulu
                 const listResult = await viewSSMembers(server.host);
@@ -83,6 +83,8 @@ module.exports = (bot, servers) => {
                 // Tangkap input pengguna
                 bot.once('message', async (msg) => {
                     const username = msg.text;
+                    const serverIndex = data.split('_')[2];
+                    const server = servers[serverIndex];
 
                     // Validasi username
                     if (!username) {
@@ -91,10 +93,25 @@ module.exports = (bot, servers) => {
                     }
 
                     // Periksa apakah username ada di /etc/xray/config.json
-                    checkUsernameExists(server.host, username, (exists) => {
+                    checkUsernameExists(server.host, username, async (exists) => {
                         if (!exists) {
-                            // Jika username tidak ditemukan
-                            bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada.`);
+                            // Jika username tidak ditemukan, tampilkan pesan dengan tombol kembali
+                            const keyboard = {
+                                inline_keyboard: [
+                                    [
+                                        { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                                    ],
+                                ],
+                            };
+
+                            await bot.sendMessage(
+                                chatId, 
+                                `❌ User \`${username}\` tidak ada.`,
+                                {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: keyboard
+                                }
+                            );
                             return;
                         }
 

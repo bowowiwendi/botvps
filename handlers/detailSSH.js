@@ -1,35 +1,38 @@
 const { exec } = require('child_process');
 
-// Function to view SSH details
-const viewSSHDetails = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "cat /var/www/html/ssh-${username}.txt"`;
+// Function to view SSH details (converted to async/await)
+const viewSSHDetails = async (vpsHost, username) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "cat /var/www/html/ssh-${username}.txt"`;
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`Error: Gagal mengambil detail SSH. Pastikan file /var/www/html/ssh-${username}.txt ada di server.`);
-            return;
-        }
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal mengambil detail SSH.\nPastikan file /var/www/html/ssh-${username}.txt ada di server.`);
+                return;
+            }
 
-        // Format output
-        const formattedOutput = `🔍 *DETAIL SSH* 🔍\n\n` +
-                              "```\n" +
-                              stdout +
-                              "\n```";
+            const formattedOutput = `🔍 *DETAIL SSH* 🔍\n\n` +
+                                 "```\n" +
+                                 stdout +
+                                 "\n```";
 
-        callback(null, formattedOutput);
+            resolve(formattedOutput);
+        });
     });
 };
 
-// Function to check user in /etc/shadow
-const checkUserInShadow = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "grep '^${username}:' /etc/shadow"`;
+// Function to check user in /etc/shadow (converted to async/await)
+const checkUserInShadow = async (vpsHost, username) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "grep '^${username}:' /etc/shadow"`;
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(null, false); // User not found
-            return;
-        }
-        callback(null, true); // User found
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                resolve(false); // User not found
+            } else {
+                resolve(true); // User found
+            }
+        });
     });
 };
 
@@ -38,75 +41,86 @@ module.exports = (bot, servers) => {
         const chatId = query.message.chat.id;
         const data = query.data;
 
-        if (data.startsWith('detail_ssh_')) {
-            const serverIndex = data.split('_')[2];
-            const server = servers[serverIndex];
+        try {
+            if (data.startsWith('detail_ssh_')) {
+                const serverIndex = data.split('_')[2];
+                const server = servers[serverIndex];
 
-            // if (!server) {
-            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-            //     return;
-            // }
-
-            await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dilihat detailnya:');
-
-            // Use a unique identifier for the message listener
-            const listenerId = `detail_ssh_${chatId}_${Date.now()}`;
-            
-            const messageHandler = async (msg) => {
-                // Check if message is from the same chat
-                if (msg.chat.id !== chatId || !msg.text || msg.text.startsWith('/')) {
+                // Validasi server
+                if (!server) {
+                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
                     return;
                 }
 
-                // Remove listener after use
-                bot.removeListener('message', messageHandler);
+                // Minta input username
+                await bot.sendMessage(chatId, 'Masukkan username SSH yang ingin dilihat detailnya:');
 
-                const username = msg.text.trim();
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
+                    const username = msg.text.trim();
+                    const serverIndex = data.split('_')[2];
+                    const server = servers[serverIndex];
 
-                if (!username) {
-                    await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
-                    return;
-                }
-
-                checkUserInShadow(server.host, username, async (error, userExists) => {
-                    if (error) {
-                        await bot.sendMessage(chatId, 'Terjadi kesalahan saat mengecek user.');
+                    if (!username) {
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong.');
                         return;
                     }
 
-                    if (!userExists) {
-                        await bot.sendMessage(chatId, `User *${username}* tidak ditemukan.`, {
-                            parse_mode: 'Markdown',
-                        });
-                        return;
-                    }
+                    const keyboard = {
+                        inline_keyboard: [
+                            [
+                                { 
+                                    text: '🔙 Kembali', 
+                                    callback_data: `list_member_${serverIndex}` 
+                                },
+                            ],
+                        ],
+                    };
 
-                    viewSSHDetails(server.host, username, async (error, result) => {
-                        if (error) {
-                            await bot.sendMessage(chatId, error);
+                    try {
+                        // Periksa apakah user ada
+                        const userExists = await checkUserInShadow(server.host, username);
+                        
+                        if (!userExists) {
+                            await bot.sendMessage(
+                                chatId, 
+                                `❌ User \`${username}\` tidak ditemukan.`,
+                                {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: keyboard
+                                }
+                            );
                             return;
                         }
 
-                        const keyboard = {
-                            inline_keyboard: [
-                                [
-                                    { 
-                                        text: '🔙 Kembali ke Daftar', 
-                                        callback_data: `list_member_${serverIndex}` 
-                                    },
-                                ],
-                            ],
-                        };
+                        // Ambil detail SSH
+                        const result = await viewSSHDetails(server.host, username);
+                        
+                        await bot.sendMessage(
+                            chatId, 
+                            result, 
+                            {
+                                parse_mode: 'Markdown',
+                                reply_markup: keyboard
+                            }
+                        );
 
-                        await bot.sendMessage(chatId, result, {
-                            parse_mode: 'Markdown',
-                            reply_markup: keyboard,
-                        });
-                    });
+                    } catch (error) {
+                        console.error('Error:', error);
+                        await bot.sendMessage(
+                            chatId, 
+                            error,
+                            {
+                                parse_mode: 'Markdown',
+                                reply_markup: keyboard
+                            }
+                        );
+                    }
                 });
-            };
-
-            bot.on('message', messageHandler);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
         }
     });
 };

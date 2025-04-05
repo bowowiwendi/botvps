@@ -2,52 +2,49 @@ const { exec } = require('child_process');
 
 const viewSSMembers = async (vpsHost) => {
     return new Promise((resolve, reject) => {
-        // Validasi input
         if (!vpsHost || typeof vpsHost !== 'string') {
-            reject('Error: VPS host tidak valid.');
+            reject('❌ VPS host tidak valid');
             return;
         }
 
-        const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^#!!" | cut -d " " -f 2-3 | sort | uniq | nl`;
+        const command = `ssh root@${vpsHost} "cat /etc/xray/config.json | grep '^#!!' | cut -d ' ' -f 2-3 | sort | uniq | nl 2>/dev/null"`;
 
         exec(command, (error, stdout, stderr) => {
-            if (error) {
-                reject(`Error: ${stderr}`);
+            if (error || !stdout.trim()) {
+                reject('❌ Gagal mendapatkan daftar member');
                 return;
             }
 
-            // Format hasil menjadi lebih menarik
             const formattedOutput = `📋 *DAFTAR MEMBER SHADOWSOCKS* 📋\n\n` +
-                                    "```\n" +
-                                    stdout +
-                                    "\n```";
-
+                                  "```\n" +
+                                  stdout +
+                                  "\n```";
             resolve(formattedOutput);
         });
     });
 };
-// Fungsi untuk memeriksa apakah username ada di /etc/xray/config.json
-const checkUsernameExists = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            // Jika username tidak ditemukan
-            callback(false);
-        } else {
-            // Jika username ditemukan
-            callback(true);
-        }
+const checkUsernameExists = (vpsHost, username) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "grep -w '${username}' /etc/xray/config.json 2>/dev/null"`;
+        
+        exec(command, (error, stdout) => {
+            resolve(!error && stdout.trim() !== '');
+        });
     });
 };
 
-// Fungsi untuk mengunci akun Shadowsocks di VPS
-const lockSS = (vpsHost, username, callback) => {
-    const command = `printf "${username}" | ssh root@${vpsHost} lock-ss`;
-
-    exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
-        callback(`✅ User \`${username}\` berhasil dikunci.`);
+const lockSS = (vpsHost, username) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} "lock-ss '${username}'"`;
+        
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal mengunci: ${stderr}`);
+            } else {
+                resolve(`✅ User \`${username}\` berhasil dikunci`);
+            }
+        });
     });
 };
 
@@ -59,51 +56,71 @@ module.exports = (bot, servers) => {
         if (data.startsWith('ss_lock_')) {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
+            
+            // Tombol kembali yang konsisten
+            const backButton = {
+                inline_keyboard: [
+                    [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+                ]
+            };
 
-            // if (!server) {
-            //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-            //     return;
-            // }
-            const listResult = await viewSSMembers(server.host);
-            // Minta input username dari pengguna
-            await bot.sendMessage(chatId, 'Masukkan username SS yang ingin dikunci:');
+            try {
+                // Tampilkan daftar member terlebih dahulu
+                const listResult = await viewSSMembers(server.host);
+                await bot.sendMessage(chatId, listResult, {
+                    parse_mode: 'Markdown',
+                    reply_markup: backButton
+                });
 
-            // Tangkap input pengguna
-            bot.once('message', async (msg) => {
-                const username = msg.text;
+                // Minta input username
+                await bot.sendMessage(chatId, '🔒 Masukkan username Shadowsocks yang ingin dikunci:', {
+                    reply_markup: backButton
+                });
 
-                if (!username) {
-                    await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
-                    return;
-                }
-
-                // Periksa apakah username ada di /etc/xray/config.json
-                checkUsernameExists(server.host, username, (exists) => {
-                    if (!exists) {
-                        // Jika username tidak ditemukan
-                        bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada.`);
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
+                    if (msg.chat.id !== chatId) return;
+                    
+                    const username = msg.text.trim();
+                    
+                    if (!username) {
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
+                            reply_markup: backButton
+                        });
                         return;
                     }
 
-                    // Jika username ditemukan, lanjutkan proses mengunci
-                    lockSS(server.host, username, (result) => {
-                        // Tambahkan tombol "Kembali ke Menu Server"
-                        const keyboard = {
-                            inline_keyboard: [
-                                [
-                                    { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                ],
-                            ],
-                        };
+                    try {
+                        // Verifikasi username
+                        const exists = await checkUsernameExists(server.host, username);
+                        if (!exists) {
+                            await bot.sendMessage(chatId, 
+                                `❌ User \`${username}\` tidak ditemukan`, 
+                                {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: backButton
+                                }
+                            );
+                            return;
+                        }
 
-                        // Kirim pesan hasil penguncian dengan tombol
-                        bot.sendMessage(chatId, result, {
+                        // Proses mengunci
+                        const result = await lockSS(server.host, username);
+                        await bot.sendMessage(chatId, result, {
                             parse_mode: 'Markdown',
-                            reply_markup: keyboard,
+                            reply_markup: backButton
                         });
-                    });
+                    } catch (error) {
+                        await bot.sendMessage(chatId, error, {
+                            reply_markup: backButton
+                        });
+                    }
                 });
-            });
+            } catch (error) {
+                await bot.sendMessage(chatId, error, {
+                    reply_markup: backButton
+                });
+            }
         }
     });
 };

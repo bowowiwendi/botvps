@@ -3,9 +3,8 @@ const { exec } = require('child_process');
 // Fungsi untuk melihat member SSH
 const viewSSMembers = async (vpsHost) => {
     return new Promise((resolve, reject) => {
-        // Validasi input
         if (!vpsHost || typeof vpsHost !== 'string') {
-            reject('Error: VPS host tidak valid.');
+            reject('❌ VPS host tidak valid');
             return;
         }
 
@@ -13,15 +12,20 @@ const viewSSMembers = async (vpsHost) => {
 
         exec(command, (error, stdout, stderr) => {
             if (error) {
-                reject(`Error: ${stderr}`);
+                reject(`❌ Gagal mengambil daftar member: ${stderr}`);
                 return;
             }
 
-            // Format hasil menjadi lebih menarik
-            const formattedOutput = `📋 *DAFTAR MEMBER SS* 📋\n\n` +
-                                    "```\n" +
-                                    stdout +
-                                    "\n```";
+            // Cek jika daftar kosong
+            if (!stdout.trim()) {
+                reject('📭 Daftar member SSH kosong');
+                return;
+            }
+
+            const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
+                                  "```\n" +
+                                  stdout +
+                                  "\n```";
 
             resolve(formattedOutput);
         });
@@ -38,33 +42,44 @@ module.exports = (bot, servers) => {
                 const serverIndex = data.split('_')[2];
                 const server = servers[serverIndex];
 
-                // // Validasi serverIndex
-                // if (isNaN(serverIndex) || serverIndex < 0 || serverIndex >= servers.length) {
-                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                //     return;
-                // }
+                // Validasi server
+                if (!server) {
+                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan');
+                    return;
+                }
 
-                // Panggil fungsi viewSSMembers
-                const result = await viewSSMembers(server.host);
-
-                // Tambahkan tombol "Kembali ke Pemilihan Server"
                 const keyboard = {
                     inline_keyboard: [
                         [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                            { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
                         ],
                     ],
                 };
 
-                // Kirim pesan dengan tombol
-                await bot.sendMessage(chatId, result, {
-                    parse_mode: 'Markdown',
-                    reply_markup: keyboard,
-                });
+                try {
+                    // Panggil fungsi viewSSMembers
+                    const result = await viewSSMembers(server.host);
+                    
+                    await bot.sendMessage(chatId, result, {
+                        parse_mode: 'Markdown',
+                        reply_markup: keyboard,
+                    });
+
+                } catch (error) {
+                    // Kirim pesan error dengan tombol kembali
+                    await bot.sendMessage(
+                        chatId, 
+                        error,
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+                }
             }
         } catch (error) {
             console.error('Error:', error);
-            await bot.sendMessage(chatId, 'Terjadi kesalahan. Silakan coba lagi.');
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi');
         }
     });
 };

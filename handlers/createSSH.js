@@ -30,16 +30,17 @@ const updateAdminBalance = (adminId, amount) => {
 };
 
 const addToMainAdminBalance = (amount) => {
-       const admins = getAdmins();
-       const mainAdmin = admins.find(a => a.is_main);
-       
-       if (mainAdmin) {
-           mainAdmin.balance = (mainAdmin.balance || 0) + amount;
-           fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
-           return true;
-       }
-       return false;
-   };
+    const admins = getAdmins();
+    const mainAdmin = admins.find(a => a.is_main);
+    
+    if (mainAdmin) {
+        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+        fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        return true;
+    }
+    return false;
+};
+
 // Fungsi untuk mengirim laporan ke admin utama
 const sendReportToMainAdmin = async (bot, reportData) => {
     const admins = getAdmins();
@@ -147,10 +148,14 @@ const generateSSHMessage = (sshData) => {
 └─────────────────────
 ┌─────────────────────
 │ *Domain*   : \`${sshData.domain}\`
-│ *Port TLS* : \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
-│ *Port HTTP*: \`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
-│ *OpenSSH*  : \`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
-│ *UdpSSH*   : \`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
+│ *Port TLS* : 
+│ \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
+│ *Port HTTP*: 
+│\`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
+│ *OpenSSH*  : 
+│\`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
+│ *UdpSSH*   : 
+│\`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
 │ *DNS*      : \`443, 53, 22\`
 │ *Dropbear* : \`443, 109\`
 │ *SSH WS*   : \`80\`
@@ -177,6 +182,15 @@ Save Account Link: [Save Account](https://${sshData.domain}:81/ssh-${sshData.use
     `;
 };
 
+// Fungsi untuk membuat keyboard kembali
+const createBackKeyboard = (serverIndex) => {
+    return {
+        inline_keyboard: [
+            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+        ]
+    };
+};
+
 module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
@@ -194,7 +208,9 @@ module.exports = (bot, servers) => {
             const admin = admins.find(a => a.id === from.id);
 
             if (!admin) {
-                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!');
+                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!', {
+                    reply_markup: createBackKeyboard(serverIndex)
+                });
                 return;
             }
 
@@ -202,7 +218,10 @@ module.exports = (bot, servers) => {
             
             // Cek saldo admin hanya jika bukan main admin
             if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
-                await bot.sendMessage(chatId, `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
+                await bot.sendMessage(chatId, 
+                    `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`, 
+                    { reply_markup: createBackKeyboard(serverIndex) }
+                );
                 return;
             }
 
@@ -220,7 +239,9 @@ module.exports = (bot, servers) => {
                     [username, password, limitDevice, activePeriod] = input;
                     
                     if (!username || !password || !limitDevice || !activePeriod) {
-                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.', {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
                 } else {
@@ -230,14 +251,18 @@ module.exports = (bot, servers) => {
                     activePeriod = '30';
                     
                     if (!username || !password) {
-                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.', {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
                 }
 
                 createSSH(server.host, username, password, limitDevice, activePeriod, privateKeyPath, async (error, sshData) => {
                     if (error) {
-                        return await bot.sendMessage(chatId, error.message);
+                        return await bot.sendMessage(chatId, error.message, {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                     }
 
                     // Update saldo admin hanya jika bukan main admin
@@ -260,15 +285,9 @@ module.exports = (bot, servers) => {
 
                     // Kirim hasil ke user
                     const message = generateSSHMessage(sshData);
-                    const keyboard = {
-                        inline_keyboard: [
-                            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
-                        ],
-                    };
-
                     await bot.sendMessage(chatId, message, {
                         parse_mode: 'Markdown',
-                        reply_markup: keyboard,
+                        reply_markup: createBackKeyboard(serverIndex)
                     });
                 });
             });

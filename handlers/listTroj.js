@@ -1,11 +1,10 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk melihat member SSH
+// Fungsi untuk melihat member Trojan (async/await)
 const viewTrojMembers = async (vpsHost) => {
     return new Promise((resolve, reject) => {
-        // Validasi input
         if (!vpsHost || typeof vpsHost !== 'string') {
-            reject('Error: VPS host tidak valid.');
+            reject('❌ VPS host tidak valid');
             return;
         }
 
@@ -13,15 +12,22 @@ const viewTrojMembers = async (vpsHost) => {
 
         exec(command, (error, stdout, stderr) => {
             if (error) {
-                reject(`Error: ${stderr}`);
+                reject(`❌ Gagal mengambil daftar member: ${stderr}`);
                 return;
             }
 
-            // Format hasil menjadi lebih menarik
-            const formattedOutput = `📋 *DAFTAR MEMBER Troj* 📋\n\n` +
-                                    "```\n" +
-                                    stdout +
-                                    "\n```";
+            const output = stdout.trim();
+            
+            // Cek jika daftar kosong
+            if (!output) {
+                reject('📭 Daftar member Trojan kosong');
+                return;
+            }
+
+            const formattedOutput = `📋 *DAFTAR MEMBER TROJAN* 📋\n\n` +
+                                  "```\n" +
+                                  output +
+                                  "\n```";
 
             resolve(formattedOutput);
         });
@@ -36,36 +42,53 @@ module.exports = (bot, servers) => {
         try {
             if (data.startsWith('troj_list_')) {
                 const serverIndex = data.split('_')[2];
-
-                // Validasi serverIndex
-                // if (isNaN(serverIndex) || serverIndex < 0 || serverIndex >= servers.length) {
-                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                //     return;
-                // }
-
                 const server = servers[serverIndex];
 
-                // Panggil fungsi viewTrojMembers
-                const result = await viewTrojMembers(server.host);
+                // Validasi server
+                if (!server) {
+                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan');
+                    return;
+                }
 
-                // Tambahkan tombol "Kembali ke Pemilihan Server"
                 const keyboard = {
                     inline_keyboard: [
                         [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                            { 
+                                text: '🔙 Kembali', 
+                                callback_data: `select_server_${serverIndex}` 
+                            },
                         ],
                     ],
                 };
 
-                // Kirim pesan dengan tombol
-                await bot.sendMessage(chatId, result, {
-                    parse_mode: 'Markdown',
-                    reply_markup: keyboard,
-                });
+                try {
+                    // Panggil fungsi viewTrojMembers
+                    const result = await viewTrojMembers(server.host);
+                    
+                    await bot.sendMessage(
+                        chatId, 
+                        result, 
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+
+                } catch (error) {
+                    // Kirim pesan error dengan tombol kembali
+                    await bot.sendMessage(
+                        chatId, 
+                        error,
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+                }
             }
         } catch (error) {
             console.error('Error:', error);
-            await bot.sendMessage(chatId, 'Terjadi kesalahan. Silakan coba lagi.');
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi');
         }
     });
 };

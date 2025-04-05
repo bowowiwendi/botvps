@@ -80,6 +80,8 @@ const createTrojanTrial = async (vpsHost, username, domain, privateKeyPath) => {
                     try {
                         const trojanData = JSON.parse(data);
                         trojanData.domain = domain;
+                        // Tambahkan link non-TLS
+                        trojanData.trojan_nontls_link = `trojan://${trojanData.password}@${domain}:80?path=%2Ftrojan-ws&security=none&host=${domain}&type=ws#${username}`;
                         resolve(trojanData);
                     } catch (error) {
                         reject('❌ Gagal memproses output dari server.');
@@ -139,6 +141,15 @@ const generateTrojanUsername = () => {
     return `TrojPrem${randomNumber}`;
 };
 
+// Fungsi untuk membuat keyboard kembali
+const createBackKeyboard = (serverIndex) => {
+    return {
+        inline_keyboard: [
+            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+        ]
+    };
+};
+
 module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
@@ -148,11 +159,7 @@ module.exports = (bot, servers) => {
         if (data.startsWith('troj_trial_')) {
             const serverIndex = data.split('_')[2];
             const server = servers[serverIndex];
-
-            // if (!server) {
-            //     await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
-            //     return;
-            // }
+            const backKeyboard = createBackKeyboard(serverIndex);
 
             // Dapatkan data admin
             const admins = getAdmins();
@@ -162,7 +169,9 @@ module.exports = (bot, servers) => {
             if (!isMainAdmin) {
                 if (!checkTrialLimit(from.id)) {
                     return await bot.sendMessage(chatId, 
-                        '❌ Anda sudah mencapai batas trial mingguan (3 trial per minggu).');
+                        '❌ Anda sudah mencapai batas trial mingguan (3 trial per minggu).',
+                        { reply_markup: backKeyboard }
+                    );
                 }
             }
 
@@ -181,19 +190,16 @@ module.exports = (bot, servers) => {
 
                 // Hasilkan pesan
                 const message = generateTrojanTrialMessage(trojanData);
-                const keyboard = {
-                    inline_keyboard: [
-                        [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
-                    ],
-                };
-
+                
                 await bot.sendMessage(chatId, message, {
                     parse_mode: 'Markdown',
-                    reply_markup: keyboard,
+                    reply_markup: backKeyboard,
                 });
 
             } catch (error) {
-                await bot.sendMessage(chatId, error);
+                await bot.sendMessage(chatId, error, {
+                    reply_markup: backKeyboard
+                });
             }
         }
     });

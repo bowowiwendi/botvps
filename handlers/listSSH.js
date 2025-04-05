@@ -1,22 +1,31 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk melihat member SSH
-const viewSSHMembers = (vpsHost, callback) => {
-    const command = `ssh root@${vpsHost} bot-member-ssh`;
+// Fungsi untuk melihat member SSH (async/await)
+const viewSSHMembers = async (vpsHost) => {
+    return new Promise((resolve, reject) => {
+        const command = `ssh root@${vpsHost} bot-member-ssh`;
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`❌ Gagal mengambil daftar member SSH. Error: ${stderr}`);
-            return;
-        }
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal mengambil daftar member SSH\n${stderr}`);
+                return;
+            }
 
-        // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
-                              "```\n" +
-                              stdout.trim() +  // trim() untuk menghapus whitespace berlebih
-                              "\n```";
+            const output = stdout.trim();
+            
+            // Cek jika daftar kosong
+            if (!output) {
+                reject('📭 Daftar member SSH kosong');
+                return;
+            }
 
-        callback(null, formattedOutput);
+            const formattedOutput = `📋 *DAFTAR MEMBER SSH* 📋\n\n` +
+                                 "```\n" +
+                                 output +
+                                 "\n```";
+
+            resolve(formattedOutput);
+        });
     });
 };
 
@@ -25,18 +34,17 @@ module.exports = (bot, servers) => {
         const chatId = query.message.chat.id;
         const data = query.data;
 
-        if (data.startsWith('list_member_')) {
-            const serverIndex = data.split('_')[2];
-            const server = servers[serverIndex];
+        try {
+            if (data.startsWith('list_member_')) {
+                const serverIndex = data.split('_')[2];
+                const server = servers[serverIndex];
 
-            // if (!server) {
-            //     await bot.sendMessage(chatId, '❌ Server tidak ditemukan.');
-            //     return;
-            // }
+                // Validasi server
+                if (!server) {
+                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan');
+                    return;
+                }
 
-            // Panggil fungsi viewSSHMembers
-            viewSSHMembers(server.host, async (error, result) => {
-                // Tambahkan tombol "Kembali ke Pemilihan Server"
                 const keyboard = {
                     inline_keyboard: [
                         [
@@ -48,12 +56,34 @@ module.exports = (bot, servers) => {
                     ],
                 };
 
-                // Kirim pesan dengan tombol
-                await bot.sendMessage(chatId, result, {
-                    parse_mode: 'Markdown',
-                    reply_markup: keyboard,
-                });
-            });
+                try {
+                    // Panggil fungsi viewSSHMembers
+                    const result = await viewSSHMembers(server.host);
+                    
+                    await bot.sendMessage(
+                        chatId, 
+                        result, 
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+
+                } catch (error) {
+                    // Kirim pesan error dengan tombol kembali
+                    await bot.sendMessage(
+                        chatId, 
+                        error,
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi');
         }
     });
 };

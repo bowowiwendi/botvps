@@ -28,17 +28,18 @@ const updateAdminBalance = (adminId, amount) => {
     }
     return false;
 };
+
 const addToMainAdminBalance = (amount) => {
-       const admins = getAdmins();
-       const mainAdmin = admins.find(a => a.is_main);
-       
-       if (mainAdmin) {
-           mainAdmin.balance = (mainAdmin.balance || 0) + amount;
-           fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
-           return true;
-       }
-       return false;
-   };
+    const admins = getAdmins();
+    const mainAdmin = admins.find(a => a.is_main);
+    
+    if (mainAdmin) {
+        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+        fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
+        return true;
+    }
+    return false;
+};
 
 // Fungsi untuk mengirim laporan ke admin utama
 const sendReportToMainAdmin = async (bot, reportData) => {
@@ -179,6 +180,15 @@ Save Account Link: [Save Account](https://${ssData.domain}:81/shadowsocks-${ssDa
     `;
 };
 
+// Fungsi untuk membuat keyboard kembali
+const createBackKeyboard = (serverIndex) => {
+    return {
+        inline_keyboard: [
+            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+        ]
+    };
+};
+
 module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
@@ -197,7 +207,9 @@ module.exports = (bot, servers) => {
             const admin = admins.find(a => a.id === from.id);
 
             if (!admin) {
-                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!');
+                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!', {
+                    reply_markup: createBackKeyboard(serverIndex)
+                });
                 return;
             }
 
@@ -205,14 +217,21 @@ module.exports = (bot, servers) => {
             
             // Cek saldo admin hanya jika bukan main admin
             if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
-                await bot.sendMessage(chatId, `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
+                await bot.sendMessage(chatId, 
+                    `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`, 
+                    { reply_markup: createBackKeyboard(serverIndex) }
+                );
                 return;
             }
 
             if (isMainAdmin) {
-                await bot.sendMessage(chatId, 'Masukkan detail Shadow (format: username quota ip_limit masa_aktif):');
+                await bot.sendMessage(chatId, 'Masukkan detail Shadow (format: username quota ip_limit masa_aktif):', {
+                    reply_markup: createBackKeyboard(serverIndex)
+                });
             } else {
-                await bot.sendMessage(chatId, 'Cukup Masukkan username \nFormat: username');
+                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, IP: 2, Masa aktif: 30 hari)\nFormat: username', {
+                    reply_markup: createBackKeyboard(serverIndex)
+                });
             }
 
             const messageHandler = async (msg) => {
@@ -225,7 +244,9 @@ module.exports = (bot, servers) => {
                     [username, quota, ipLimit, activePeriod] = input;
                     
                     if (!username || !quota || !ipLimit || !activePeriod) {
-                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.', {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
                 } else {
@@ -235,7 +256,9 @@ module.exports = (bot, servers) => {
                     activePeriod = '30';
                     
                     if (!username) {
-                        await bot.sendMessage(chatId, 'Username tidak boleh kosong. Silakan coba lagi.');
+                        await bot.sendMessage(chatId, 'Username tidak boleh kosong. Silakan coba lagi.', {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
                 }
@@ -244,7 +267,9 @@ module.exports = (bot, servers) => {
                     // Cek username
                     const usernameExists = await checkUsernameExists(server.host, username, privateKeyPath);
                     if (usernameExists) {
-                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada.`);
+                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada.`, {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
 
@@ -271,19 +296,15 @@ module.exports = (bot, servers) => {
 
                     // Kirim hasil ke user
                     const message = generateShadowsocksMessage(ssData);
-                    const keyboard = {
-                        inline_keyboard: [
-                            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
-                        ],
-                    };
-
                     await bot.sendMessage(chatId, message, {
                         parse_mode: 'Markdown',
-                        reply_markup: keyboard,
+                        reply_markup: createBackKeyboard(serverIndex)
                     });
 
                 } catch (error) {
-                    await bot.sendMessage(chatId, `❌ Error: ${error}`);
+                    await bot.sendMessage(chatId, `❌ Error: ${error}`, {
+                        reply_markup: createBackKeyboard(serverIndex)
+                    });
                 }
             };
 

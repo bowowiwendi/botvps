@@ -1,28 +1,36 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk melihat member SSH
-const viewVMEMembers = (vpsHost, callback) => {
-    // Validasi input
-    if (!vpsHost || typeof vpsHost !== 'string') {
-        callback('Error: VPS host tidak valid.');
-        return;
-    }
-
-    const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl`;
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`Error: ${stderr}`);
+// Fungsi untuk melihat member VMESS (async/await)
+const viewVMEMembers = async (vpsHost) => {
+    return new Promise((resolve, reject) => {
+        if (!vpsHost || typeof vpsHost !== 'string') {
+            reject('❌ VPS host tidak valid');
             return;
         }
 
-        // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER VME* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
+        const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl`;
 
-        callback(null, formattedOutput);
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`❌ Gagal mengambil daftar member: ${stderr}`);
+                return;
+            }
+
+            const output = stdout.trim();
+            
+            // Cek jika daftar kosong
+            if (!output) {
+                reject('📭 Daftar member VMESS kosong');
+                return;
+            }
+
+            const formattedOutput = `📋 *DAFTAR MEMBER VMESS* 📋\n\n` +
+                                  "```\n" +
+                                  output +
+                                  "\n```";
+
+            resolve(formattedOutput);
+        });
     });
 };
 
@@ -34,41 +42,53 @@ module.exports = (bot, servers) => {
         try {
             if (data.startsWith('vme_list_')) {
                 const serverIndex = data.split('_')[2];
-
-                // Validasi serverIndex
-                // if (isNaN(serverIndex) || serverIndex < 0 || serverIndex >= servers.length) {
-                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                //     return;
-                // }
-
                 const server = servers[serverIndex];
 
-                // Panggil fungsi viewVMEMembers
-                viewVMEMembers(server.host, (error, result) => {
-                    if (error) {
-                        bot.sendMessage(chatId, error);
-                        return;
-                    }
+                // Validasi server
+                if (!server) {
+                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan');
+                    return;
+                }
 
-                    // Tambahkan tombol "Kembali ke Pemilihan Server"
-                    const keyboard = {
-                        inline_keyboard: [
-                            [
-                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                            ],
+                const keyboard = {
+                    inline_keyboard: [
+                        [
+                            { 
+                                text: '🔙 Kembali', 
+                                callback_data: `select_server_${serverIndex}` 
+                            },
                         ],
-                    };
+                    ],
+                };
 
-                    // Kirim pesan dengan tombol
-                    bot.sendMessage(chatId, result, {
-                        parse_mode: 'Markdown',
-                        reply_markup: keyboard,
-                    });
-                });
+                try {
+                    // Panggil fungsi viewVMEMembers
+                    const result = await viewVMEMembers(server.host);
+                    
+                    await bot.sendMessage(
+                        chatId, 
+                        result, 
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+
+                } catch (error) {
+                    // Kirim pesan error dengan tombol kembali
+                    await bot.sendMessage(
+                        chatId, 
+                        error,
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard
+                        }
+                    );
+                }
             }
         } catch (error) {
             console.error('Error:', error);
-            await bot.sendMessage(chatId, 'Terjadi kesalahan internal. Silakan coba lagi.');
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi');
         }
     });
 };

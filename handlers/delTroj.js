@@ -3,7 +3,6 @@ const { exec } = require('child_process');
 // Fungsi untuk melihat daftar member Trojan
 const viewTrojMembers = async (vpsHost) => {
     return new Promise((resolve, reject) => {
-        // Validasi input
         if (!vpsHost || typeof vpsHost !== 'string') {
             reject('Error: VPS host tidak valid.');
             return;
@@ -17,39 +16,39 @@ const viewTrojMembers = async (vpsHost) => {
                 return;
             }
 
-            // Format hasil menjadi lebih menarik
             const formattedOutput = `📋 *DAFTAR MEMBER TROJAN* 📋\n\n` +
-                                    "```\n" +
-                                    stdout +
-                                    "\n```";
+                                  "```\n" +
+                                  stdout +
+                                  "\n```";
 
             resolve(formattedOutput);
         });
     });
 };
 
-// Fungsi untuk memeriksa apakah username ada di /etc/xray/config.json
+// Fungsi untuk memeriksa apakah username ada di config.json
 const checkUsernameExists = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            // Jika username tidak ditemukan
             callback(false);
         } else {
-            // Jika username ditemukan
             callback(true);
         }
     });
 };
 
-// Fungsi untuk menghapus member Trojan di VPS
+// Fungsi untuk menghapus member Trojan
 const deleteTroj = (vpsHost, username, callback) => {
     const command = `printf "${username}" | ssh root@${vpsHost} deltr`;
 
     exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
-        callback(`✅ User \`${username}\` berhasil dihapus.`);
+        if (error) {
+            callback(`❌ Gagal menghapus user \`${username}\`: ${stderr}`);
+        } else {
+            callback(`✅ User \`${username}\` berhasil dihapus.`);
+        }
     });
 };
 
@@ -64,52 +63,59 @@ module.exports = (bot, servers) => {
                 const server = servers[serverIndex];
 
                 // Validasi server
-                // if (!server) {
-                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                //     return;
-                // }
+                if (!server) {
+                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                    return;
+                }
 
-                // Tampilkan daftar Trojan terlebih dahulu
-                const listResult = await viewTrojMembers(server.host);
+                // Tampilkan daftar member Trojan
+                try {
+                    const listResult = await viewTrojMembers(server.host);
+                    await bot.sendMessage(chatId, listResult, {
+                        parse_mode: 'Markdown'
+                    });
+                } catch (error) {
+                    console.error('Error:', error);
+                    await bot.sendMessage(chatId, 'Gagal mendapatkan daftar member Trojan.');
+                }
 
-                // Kirim daftar Trojan ke pengguna
-                await bot.sendMessage(chatId, listResult, {
-                    parse_mode: 'Markdown',
-                });
-
-                // Minta input username dari pengguna setelah menampilkan daftar
+                // Minta input username
                 await bot.sendMessage(chatId, 'Masukkan username Trojan yang ingin dihapus:');
 
                 // Tangkap input pengguna
                 bot.once('message', async (msg) => {
                     const username = msg.text;
+                    const serverIndex = data.split('_')[2];
+                    const server = servers[serverIndex];
 
-                    // Validasi username
                     if (!username) {
                         await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
                         return;
                     }
 
-                    // Periksa apakah username ada di /etc/xray/config.json
-                    checkUsernameExists(server.host, username, (exists) => {
+                    const keyboard = {
+                        inline_keyboard: [
+                            [
+                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                            ],
+                        ],
+                    };
+
+                    // Periksa dan hapus user
+                    checkUsernameExists(server.host, username, async (exists) => {
                         if (!exists) {
-                            // Jika username tidak ditemukan
-                            bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada.`);
+                            await bot.sendMessage(
+                                chatId, 
+                                `❌ User \`${username}\` tidak ada.`,
+                                {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: keyboard
+                                }
+                            );
                             return;
                         }
 
-                        // Jika username ditemukan, lanjutkan penghapusan
                         deleteTroj(server.host, username, (result) => {
-                            // Tambahkan tombol "Kembali ke Menu Server"
-                            const keyboard = {
-                                inline_keyboard: [
-                                    [
-                                        { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                    ],
-                                ],
-                            };
-
-                            // Kirim pesan hasil penghapusan dengan tombol
                             bot.sendMessage(chatId, result, {
                                 parse_mode: 'Markdown',
                                 reply_markup: keyboard,

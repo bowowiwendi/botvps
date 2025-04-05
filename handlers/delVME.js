@@ -1,53 +1,54 @@
 const { exec } = require('child_process');
 
-// Fungsi untuk melihat daftar member SSH
-const viewVMEMembers = (vpsHost, callback) => {
-    // Validasi input
-    if (!vpsHost || typeof vpsHost !== 'string') {
-        callback('Error: VPS host tidak valid.');
-        return;
-    }
-
-    const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl`;
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            callback(`Error: ${stderr}`);
+// Fungsi untuk melihat daftar member VMESS
+const viewVMEMembers = async (vpsHost) => {
+    return new Promise((resolve, reject) => {
+        if (!vpsHost || typeof vpsHost !== 'string') {
+            reject('Error: VPS host tidak valid.');
             return;
         }
 
-        // Format hasil menjadi lebih menarik
-        const formattedOutput = `📋 *DAFTAR MEMBER VME* 📋\n\n` +
-                                "```\n" +
-                                stdout +
-                                "\n```";
+        const command = `ssh root@${vpsHost} cat /etc/xray/config.json | grep "^###" | cut -d " " -f 2-3 | sort | uniq | nl`;
 
-        callback(null, formattedOutput);
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`Error: ${stderr}`);
+                return;
+            }
+
+            const formattedOutput = `📋 *DAFTAR MEMBER VMESS* 📋\n\n` +
+                                  "```\n" +
+                                  stdout +
+                                  "\n```";
+
+            resolve(formattedOutput);
+        });
     });
 };
 
-// Fungsi untuk memeriksa apakah username ada di /etc/xray/config.json
+// Fungsi untuk memeriksa username
 const checkUsernameExists = (vpsHost, username, callback) => {
     const command = `ssh root@${vpsHost} "grep '${username}' /etc/xray/config.json"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            // Jika username tidak ditemukan
             callback(false);
         } else {
-            // Jika username ditemukan
             callback(true);
         }
     });
 };
 
-// Fungsi untuk menghapus VMESS di VPS
+// Fungsi untuk menghapus VMESS
 const deleteVME = (vpsHost, username, callback) => {
     const command = `printf "${username}" | ssh root@${vpsHost} delws`;
 
     exec(command, (error, stdout, stderr) => {
-        // Selalu anggap berhasil, terlepas dari hasil eksekusi
-        callback(`✅ User \`${username}\` berhasil dihapus.`);
+        if (error) {
+            callback(`❌ Gagal menghapus user \`${username}\`: ${stderr}`);
+        } else {
+            callback(`✅ User \`${username}\` berhasil dihapus.`);
+        }
     });
 };
 
@@ -62,60 +63,62 @@ module.exports = (bot, servers) => {
                 const server = servers[serverIndex];
 
                 // Validasi server
-                // if (!server) {
-                //     await bot.sendMessage(chatId, 'Server tidak ditemukan.');
-                //     return;
-                // }
+                if (!server) {
+                    await bot.sendMessage(chatId, 'Server tidak ditemukan.');
+                    return;
+                }
 
-                // Tampilkan daftar VME terlebih dahulu
-                viewVMEMembers(server.host, (error, result) => {
-                    if (error) {
-                        bot.sendMessage(chatId, error);
+                // Tampilkan daftar member VMESS
+                try {
+                    const listResult = await viewVMEMembers(server.host);
+                    await bot.sendMessage(chatId, listResult, {
+                        parse_mode: 'Markdown'
+                    });
+                } catch (error) {
+                    console.error('Error:', error);
+                    await bot.sendMessage(chatId, 'Gagal mendapatkan daftar member VMESS.');
+                }
+
+                // Minta input username
+                await bot.sendMessage(chatId, 'Masukkan username VMESS yang ingin dihapus:');
+
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
+                    const username = msg.text;
+                    const serverIndex = data.split('_')[2];
+                    const server = servers[serverIndex];
+
+                    if (!username) {
+                        await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
                         return;
                     }
 
-                    // Kirim daftar VME ke pengguna
-                    bot.sendMessage(chatId, result, {
-                        parse_mode: 'Markdown',
-                    }).then(() => {
-                        // Minta input username dari pengguna setelah menampilkan daftar
-                        bot.sendMessage(chatId, 'Masukkan username VME yang ingin dihapus:');
+                    const keyboard = {
+                        inline_keyboard: [
+                            [
+                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
+                            ],
+                        ],
+                    };
 
-                        // Tangkap input username
-                        bot.once('message', async (msg) => {
-                            const username = msg.text;
-
-                            // Validasi username
-                            if (!username) {
-                                await bot.sendMessage(chatId, 'Username tidak boleh kosong.');
-                                return;
-                            }
-
-                            // Periksa apakah username ada di /etc/xray/config.json
-                            checkUsernameExists(server.host, username, (exists) => {
-                                if (!exists) {
-                                    // Jika username tidak ditemukan
-                                    bot.sendMessage(chatId, `❌ User \`${username}\` tidak ada.`);
-                                    return;
+                    // Periksa dan hapus user
+                    checkUsernameExists(server.host, username, async (exists) => {
+                        if (!exists) {
+                            await bot.sendMessage(
+                                chatId, 
+                                `❌ User \`${username}\` tidak ada.`,
+                                {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: keyboard
                                 }
+                            );
+                            return;
+                        }
 
-                                // Jika username ditemukan, lanjutkan penghapusan
-                                deleteVME(server.host, username, (result) => {
-                                    // Tambahkan tombol "Kembali ke Menu Server"
-                                    const keyboard = {
-                                        inline_keyboard: [
-                                            [
-                                                { text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` },
-                                            ],
-                                        ],
-                                    };
-
-                                    // Kirim pesan hasil penghapusan dengan tombol
-                                    bot.sendMessage(chatId, result, {
-                                        parse_mode: 'Markdown',
-                                        reply_markup: keyboard,
-                                    });
-                                });
+                        deleteVME(server.host, username, (result) => {
+                            bot.sendMessage(chatId, result, {
+                                parse_mode: 'Markdown',
+                                reply_markup: keyboard,
                             });
                         });
                     });
@@ -123,7 +126,7 @@ module.exports = (bot, servers) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            await bot.sendMessage(chatId, 'Terjadi kesalahan internal. Silakan coba lagi.');
+            await bot.sendMessage(chatId, 'Terjadi kesalahan. Silakan coba lagi.');
         }
     });
 };

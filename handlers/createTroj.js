@@ -199,6 +199,15 @@ Save Account Link: [Save Account](https://${trojanData.domain}:81/trojan-${troja
     `;
 };
 
+// Fungsi untuk membuat keyboard kembali
+const createBackKeyboard = (serverIndex) => {
+    return {
+        inline_keyboard: [
+            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }]
+        ]
+    };
+};
+
 module.exports = (bot, servers) => {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
@@ -217,7 +226,9 @@ module.exports = (bot, servers) => {
             const admin = admins.find(a => a.id === from.id);
 
             if (!admin) {
-                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!');
+                await bot.sendMessage(chatId, '❌ Anda tidak terdaftar sebagai admin!', {
+                    reply_markup: createBackKeyboard(serverIndex)
+                });
                 return;
             }
 
@@ -225,7 +236,10 @@ module.exports = (bot, servers) => {
             
             // Cek saldo admin hanya jika bukan main admin
             if (!isMainAdmin && (admin.balance || 0) < serverPrice) {
-                await bot.sendMessage(chatId, `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
+                await bot.sendMessage(chatId, 
+                    `❌ Saldo Anda tidak mencukupi! Harga server ini Rp ${serverPrice.toLocaleString()}\nSaldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`, 
+                    { reply_markup: createBackKeyboard(serverIndex) }
+                );
                 return;
             }
 
@@ -245,7 +259,9 @@ module.exports = (bot, servers) => {
                     [username, quota, ipLimit, activePeriod] = input;
                     
                     if (!username || !quota || !ipLimit || !activePeriod) {
-                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.');
+                        await bot.sendMessage(chatId, 'Format input salah. Silakan coba lagi.', {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
                 } else {
@@ -255,7 +271,9 @@ module.exports = (bot, servers) => {
                     activePeriod = '30';
                     
                     if (!username) {
-                        await bot.sendMessage(chatId, 'Username tidak boleh kosong. Silakan coba lagi.');
+                        await bot.sendMessage(chatId, 'Username tidak boleh kosong. Silakan coba lagi.', {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
                 }
@@ -264,7 +282,9 @@ module.exports = (bot, servers) => {
                     // Cek username
                     const usernameExists = await checkUsernameExists(server.host, username, privateKeyPath);
                     if (usernameExists) {
-                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada.`);
+                        await bot.sendMessage(chatId, `❌ Username "${username}" sudah ada.`, {
+                            reply_markup: createBackKeyboard(serverIndex)
+                        });
                         return;
                     }
 
@@ -291,19 +311,15 @@ module.exports = (bot, servers) => {
 
                     // Kirim hasil ke user
                     const message = generateTrojanMessage(trojanData);
-                    const keyboard = {
-                        inline_keyboard: [
-                            [{ text: '🔙 Kembali', callback_data: `select_server_${serverIndex}` }],
-                        ],
-                    };
-
                     await bot.sendMessage(chatId, message, {
                         parse_mode: 'Markdown',
-                        reply_markup: keyboard,
+                        reply_markup: createBackKeyboard(serverIndex)
                     });
 
                 } catch (error) {
-                    await bot.sendMessage(chatId, error);
+                    await bot.sendMessage(chatId, error, {
+                        reply_markup: createBackKeyboard(serverIndex)
+                    });
                 }
             };
 
