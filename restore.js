@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const https = require('https'); // Menggunakan modul https bawaan Node.js
+const https = require('https');
 
 // Fungsi untuk membaca data admin
 function readAdmins() {
@@ -37,6 +37,31 @@ function downloadFile(url) {
     });
 }
 
+// Fungsi untuk mendapatkan admin utama (pertama dalam list)
+function getMainAdmin() {
+    const admins = readAdmins();
+    return admins.length > 0 ? admins[0] : null;
+}
+
+// Fungsi untuk menampilkan menu restore
+function showRestoreMenu(bot, chatId) {
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: '📤 Upload File Backup', callback_data: 'upload_backup' }
+            ],
+            [
+                { text: '❌ Batal', callback_data: 'cancel_restore' }
+            ]
+        ]
+    };
+    
+    bot.sendMessage(chatId, '🔄 *Menu Restore Data*\n\nSilakan pilih opsi berikut:', {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
 // Fungsi utama untuk handle restore
 async function handleRestore(bot, msg) {
     const chatId = msg.chat.id;
@@ -46,20 +71,35 @@ async function handleRestore(bot, msg) {
     const admins = readAdmins();
     const isAdmin = admins.some(admin => admin.id === userId);
     if (!isAdmin) {
-        return bot.sendMessage(chatId, 'Anda tidak memiliki izin untuk melakukan ini.');
+        return bot.sendMessage(chatId, '⛔ Anda tidak memiliki izin untuk melakukan ini.');
+    }
+
+    showRestoreMenu(bot, chatId);
+}
+
+// Fungsi untuk memproses file backup
+async function processBackupFile(bot, msg) {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    
+    // Verifikasi admin
+    const admins = readAdmins();
+    const isAdmin = admins.some(admin => admin.id === userId);
+    if (!isAdmin) {
+        return bot.sendMessage(chatId, '⛔ Anda tidak memiliki izin untuk melakukan ini.');
     }
 
     // Cek apakah ada dokumen yang dilampirkan
-    if (!msg.reply_to_message || !msg.reply_to_message.document) {
-        return bot.sendMessage(chatId, 'Silakan reply pesan ini ke file backup yang ingin direstore.\nContoh: /restore [reply ke file backup]');
+    if (!msg.document) {
+        return bot.sendMessage(chatId, '📄 Silakan lampirkan file backup yang ingin direstore.\n\nFormat nama file harus mengandung:\n- "backup"\n- "admins" atau "servers"');
     }
 
-    const file = msg.reply_to_message.document;
+    const file = msg.document;
     
     // Validasi file backup
     if (!file.file_name.includes('backup') || 
         (!file.file_name.includes('admins') && !file.file_name.includes('servers'))) {
-        return bot.sendMessage(chatId, 'File tidak valid. Harap gunakan file backup yang benar.');
+        return bot.sendMessage(chatId, '❌ File tidak valid. Format nama file harus mengandung:\n- "backup"\n- "admins" atau "servers"');
     }
 
     // Membuat keyboard konfirmasi
@@ -72,7 +112,8 @@ async function handleRestore(bot, msg) {
         ]
     };
     
-    bot.sendMessage(chatId, `Anda yakin ingin merestore data dari file ${file.file_name}?`, {
+    bot.sendMessage(chatId, `⚠️ *Konfirmasi Restore* \n\nAnda yakin ingin merestore data dari file:\n\`${file.file_name}\`?`, {
+        parse_mode: 'Markdown',
         reply_markup: keyboard
     });
 }
@@ -80,42 +121,70 @@ async function handleRestore(bot, msg) {
 async function performRestore(bot, fileId, userId, originalChatId) {
     try {
         const fileInfo = await bot.getFile(fileId);
+        const mainAdmin = getMainAdmin();
         
         // Menentukan jenis file
         const fileType = fileInfo.file_path.includes('admins') ? 'admins' : 
                          fileInfo.file_path.includes('servers') ? 'servers' : null;
         
         if (!fileType) {
-            return { success: false, message: 'File backup tidak valid.' };
+            return { success: false, message: '❌ File backup tidak valid.' };
         }
 
         // Membuat URL file
         const fileUrl = `https://api.telegram.org/file/bot${bot.token}/${fileInfo.file_path}`;
         
-        // Mengunduh file menggunakan https
+        // Mengunduh file backup baru
         const fileContent = await downloadFile(fileUrl);
 
         // Validasi JSON
+        let parsedData;
         try {
-            JSON.parse(fileContent);
+            parsedData = JSON.parse(fileContent);
         } catch (e) {
-            return { success: false, message: 'File backup tidak valid (format JSON salah).' };
+            return { success: false, message: '❌ File backup tidak valid (format JSON salah).' };
         }
 
-        // Backup file saat ini sebelum ditimpa
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupFilename = `${fileType}-pre-restore-${timestamp}.json`;
-        if (fs.existsSync(`${fileType}.json`)) {
-            fs.copyFileSync(`${fileType}.json`, backupFilename);
+        // Validasi struktur data
+        if (!Array.isArray(parsedData)) {
+            return { success: false, message: '❌ Struktur data backup tidak valid (harus berupa array).' };
+        }
+
+        // Kirim file asli ke admin sebelum diubah
+        if (fs.existsSync(path.join(__dirname, `${fileType}.json`))) {
+            const currentFileContent = fs.readFileSync(path.join(__dirname, `${fileType}.json`), 'utf8');
+            
+            if (mainAdmin) {
+                await bot.sendDocument(
+                    mainAdmin.id,
+                    Buffer.from(currentFileContent),
+                    {},
+                    {
+                        filename: `${fileType}-backup-before-restore.json`,
+                        contentType: 'application/json'
+                    }
+                );
+                
+                await bot.sendMessage(
+                    mainAdmin.id,
+                    `⚠️ *Backup Before Restore*\n\nFile ${fileType}.json akan diganti dengan data baru.\n\n` +
+                    `Restore dilakukan oleh: ${userId}\n` +
+                    `Pada chat: ${originalChatId}`,
+                    { parse_mode: 'Markdown' }
+                );
+            }
         }
 
         // Menulis file baru
-        fs.writeFileSync(`${fileType}.json`, fileContent);
+        fs.writeFileSync(
+            path.join(__dirname, `${fileType}.json`),
+            JSON.stringify(parsedData, null, 2)
+        );
 
         return { 
             success: true, 
             message: `✅ Data ${fileType} berhasil direstore dari backup.`,
-            details: `File asli telah dibackup sebagai ${backupFilename}`
+            fileType: fileType
         };
     } catch (error) {
         console.error('Gagal melakukan restore:', error);
@@ -133,46 +202,77 @@ module.exports = (bot) => {
         handleRestore(bot, msg);
     });
 
+    // Handle dokumen yang dikirim setelah memilih upload backup
+    bot.on('message', (msg) => {
+        if (msg.document && msg.reply_to_message && 
+            msg.reply_to_message.text && 
+            msg.reply_to_message.text.includes('Upload File Backup')) {
+            processBackupFile(bot, msg);
+        }
+    });
+
     // Handle callback query
     bot.on('callback_query', async (query) => {
-        if (query.data.startsWith('confirm_restore_')) {
-            const fileId = query.data.split('_')[2];
-            const chatId = query.message.chat.id;
-            const userId = query.from.id;
+        const chatId = query.message.chat.id;
+        const userId = query.from.id;
+        const messageId = query.message.message_id;
+
+        try {
+            // Menu utama restore
+            if (query.data === 'upload_backup') {
+                await bot.answerCallbackQuery(query.id);
+                const reply = await bot.sendMessage(chatId, '📤 Silakan upload file backup Anda sekarang.', {
+                    reply_markup: {
+                        force_reply: true
+                    }
+                });
+                return;
+            }
             
-            try {
+            // Konfirmasi restore
+            if (query.data.startsWith('confirm_restore_')) {
+                await bot.answerCallbackQuery(query.id, { text: 'Memproses restore...' });
+                const fileId = query.data.split('_')[2];
+                
                 const result = await performRestore(bot, fileId, userId, chatId);
                 
-                bot.sendMessage(chatId, result.message);
-                if (result.details) {
-                    bot.sendMessage(chatId, result.details);
+                if (result.success) {
+                    await bot.sendMessage(chatId, result.message);
+                    
+                    // Edit pesan asli
+                    await bot.editMessageText(`✅ *Restore ${result.fileType} Selesai*`, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'Markdown'
+                    });
+                } else {
+                    await bot.sendMessage(chatId, result.message);
+                    if (result.error) {
+                        console.error('Error Restore:', result.error);
+                    }
+                    
+                    await bot.editMessageText(`❌ Restore Gagal`, {
+                        chat_id: chatId,
+                        message_id: messageId
+                    });
                 }
-                
-                if (result.error) {
-                    console.error('Error Restore:', result.error);
-                }
-                
-                // Edit pesan asli
-                bot.editMessageText(`Proses restore untuk file telah selesai.`, {
-                    chat_id: chatId,
-                    message_id: query.message.message_id
-                });
-            } catch (error) {
-                console.error('Error proses restore:', error);
-                bot.sendMessage(chatId, 'Terjadi kesalahan sistem saat memproses file.');
-                bot.editMessageText('Restore gagal karena error sistem.', {
-                    chat_id: chatId,
-                    message_id: query.message.message_id
-                });
+                return;
             }
-        }
-        
-        if (query.data === 'cancel_restore') {
-            const chatId = query.message.chat.id;
-            bot.editMessageText('Restore dibatalkan.', {
-                chat_id: chatId,
-                message_id: query.message.message_id
-            });
+            
+            // Batal restore
+            if (query.data === 'cancel_restore') {
+                await bot.answerCallbackQuery(query.id, { text: 'Restore dibatalkan' });
+                await bot.editMessageText('❌ Restore dibatalkan', {
+                    chat_id: chatId,
+                    message_id: messageId
+                });
+                return;
+            }
+            
+        } catch (error) {
+            console.error('Error callback query:', error);
+            await bot.answerCallbackQuery(query.id, { text: 'Terjadi kesalahan sistem' });
+            await bot.sendMessage(chatId, '⚠️ Terjadi kesalahan sistem. Silakan coba lagi.');
         }
     });
 };

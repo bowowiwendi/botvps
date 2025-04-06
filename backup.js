@@ -220,7 +220,7 @@ function handleBackupNow(bot, chatId, userId) {
     const keyboard = {
         inline_keyboard: [
             [
-                { text: '✅ Ya, Kirim Sekarang', callback_data: 'confirm_backup' },
+                { text: '✅ Ya,', callback_data: 'confirm_backup' },
                 { text: '❌ Batal', callback_data: 'cancel_backup' }
             ]
         ]
@@ -259,16 +259,16 @@ function toggleAutoBackup(bot, chatId, messageId) {
         inline_keyboard: [
             [
                 { text: '📦 Kirim Sekarang', callback_data: 'backup_now' },
-                { text: `⏱ Auto Backup: ${autoBackupStatus}`, callback_data: 'toggle_autobackup' }
+                { text: `⏱ Auto: ${autoBackupStatus}`, callback_data: 'toggle_autobackup' }
             ],
             [
-                { text: 'ℹ Status Backup', callback_data: 'backup_status' }
+                { text: 'ℹ Status', callback_data: 'backup_status' }
             ]
         ]
     };
     
     bot.editMessageText(
-        `📂 *Menu Backup Data*\n\nAuto backup telah ${status}. Backup otomatis akan dilakukan 2x sehari (12:00 dan 24:00).`,
+        `📂 *Menu Backup Data*\n\nAuto backup telah ${status}. \n\nBackup otomatis akan dilakukan 2x sehari (12:00 dan 24:00).`,
         {
             chat_id: chatId,
             message_id: messageId,
