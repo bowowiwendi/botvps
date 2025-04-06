@@ -84,7 +84,7 @@ const showServerList = (bot, chatId, servers) => {
   ]);
   
   // Add Topup button
-  keyboard.push([{ text: '💳 Topup', callback_data: 'topup_balance' }]);
+  keyboard.push([{ text: '💳 Topup', callback_data: 'topup_saldo' }]);
   
   // Add Edit Welcome Message button only for main admins
   if (user.is_main) {

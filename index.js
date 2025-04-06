@@ -59,6 +59,8 @@ const renewIP = require('./commands/renewIP');
 const manageDetail = require('./commands/manageDetail');
 const cmd = require('./commands/cmd');
 const Topup = require('./Topup');
+const backup = require('./backup')
+const restore = require('./restore');
 const broadcast = require('./broadcast');// Import modul broadcast
 
 // Import modul broadcast
@@ -148,6 +150,8 @@ const commands = [
     { command: Topup, params: [bot, servers] },
    { command: manageDetail, params: [bot, servers] },
    { command: cmd, params: [bot, servers] },
+   { command: backup, params: [bot, servers] },
+   { command: restore, params: [bot, servers] },
 ];
 commands.forEach(cmd => {
     try {
