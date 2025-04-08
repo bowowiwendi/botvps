@@ -22,7 +22,7 @@ const updateAdminBalance = (adminId, amount) => {
     const adminIndex = admins.findIndex(a => a.id === adminId);
     
     if (adminIndex !== -1) {
-        admins[adminIndex].balance = (admins[adminIndex].balance || 0) + amount;
+        admins[adminIndex].balance = Number(admins[adminIndex].balance || 0) + Number(amount);
         fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
         return true;
     }
@@ -34,7 +34,7 @@ const addToMainAdminBalance = (amount) => {
     const mainAdmin = admins.find(a => a.is_main);
     
     if (mainAdmin) {
-        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+        mainAdmin.balance = Number(mainAdmin.balance || 0) + Number(amount);
         fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
         return true;
     }
@@ -201,6 +201,7 @@ module.exports = (bot, servers) => {
             const domain = server.domain;
             const privateKeyPath = server.privateKey;
             const serverPrice = server.harga || 0;
+            const serverLimitIp = server.LimitIp || 2;
 
             // Dapatkan data admin
             const admins = getAdmins();
@@ -229,7 +230,7 @@ module.exports = (bot, servers) => {
                     reply_markup: createBackKeyboard(serverIndex)
                 });
             } else {
-                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, IP: 2, Masa aktif: 30 hari)\nFormat: username', {
+                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, Masa aktif: 30 hari)\nFormat: username', {
                     reply_markup: createBackKeyboard(serverIndex)
                 });
             }
@@ -252,7 +253,8 @@ module.exports = (bot, servers) => {
                 } else {
                     username = msg.text.trim();
                     quota = '1000';
-                    ipLimit = '2';
+                    // Get IP limit from server configuration
+                    ipLimit = serverLimitIp || '2'; // Default to 2 if not specified
                     activePeriod = '30';
                     
                     if (!username) {
@@ -280,7 +282,7 @@ module.exports = (bot, servers) => {
                     if (!isMainAdmin) {
                         // Kurangi saldo admin yang membuat
                         updateAdminBalance(admin.id, -serverPrice);
-                        // Tambahkan saldo ke admin utama
+                        // Tambahkan saldo ke admin utama dengan jumlah yang benar
                         addToMainAdminBalance(serverPrice);
                     }
 

@@ -157,11 +157,12 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         '🔷 Anda adalah ADMIN UTAMA (tidak dikenakan biaya)\n' +
                         'Masukkan username dan masa aktif (dalam hari):\n' +
                         'Format: username masa_aktif\n' +
-                        'Kosongkan masa aktif untuk default 30 hari');
+                        'Kosongkan masa aktif untuk default 30 hari\n' +
+                        'Contoh: user1 30');
                 } else {
                     await bot.sendMessage(chatId, 
-                        'Masukkan username:\n' +
-                        'Format: username\n' +
+                        'Masukkan username dan masa aktif (dalam hari):\n' +
+                        'Format: username masa_aktif\n' +
                         `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
                         'Default untuk admin biasa: 30 hari\n' +
                         'Contoh: user1 30');
@@ -179,7 +180,7 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         return;
                     }
 
-                    // Set default untuk admin biasa atau jika kosong
+                    // Set default untuk masa aktif jika kosong
                     exp = exp || '30';
 
                     // Validasi input numerik

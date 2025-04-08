@@ -172,14 +172,13 @@ GET wss://BUG.COM/ HTTP/1.1
 Host: ${sshData.domain}
 Upgrade: websocket
 \`\`\`
-OpenVPN Link     : [Download OpenVPN](https://${sshData.domain}:81/allovpn.zip)
-Save Account Link: [Save Account](https://${sshData.domain}:81/ssh-${sshData.username}.txt)
-───────────────────────
 ┌─────────────────────
 │ Expires: \`${sshData.expired}\`
 │ IP Limit: \`${sshData.ip_limit}\`
 └─────────────────────
-    `;
+OpenVPN Link     : [Download OpenVPN](https://${sshData.domain}:81/allovpn.zip)
+Save Account Link: [Save Account](https://${sshData.domain}:81/ssh-${sshData.username}.txt)
+  ✨ Selamat menggunakan layanan kami! ✨ `;
 };
 
 // Fungsi untuk membuat keyboard kembali
@@ -202,6 +201,7 @@ module.exports = (bot, servers) => {
             const server = servers[serverIndex];
             const privateKeyPath = server.privateKey;
             const serverPrice = server.harga || 0;
+            const serverLimitIp = server.LimitIp || 2;
 
             // Dapatkan data admin
             const admins = getAdmins();
@@ -247,7 +247,7 @@ module.exports = (bot, servers) => {
                 } else {
                     const input = msg.text.split(' ');
                     [username, password] = input;
-                    limitDevice = '2';
+                    limitDevice = serverLimitIp || '2';
                     activePeriod = '30';
                     
                     if (!username || !password) {

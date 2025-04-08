@@ -110,6 +110,17 @@ module.exports = (bot) => {
             }
             else if (state.step === 'domain') {
                 if (text) userStates[chatId].tempServer.domain = text;
+                userStates[chatId].step = 'ip_limit';
+                bot.sendMessage(chatId, '🔢 Masukkan IP Limit (jumlah maksimal IP, contoh: 5):', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ Batalkan', callback_data: 'cancel_operation' }]
+                        ]
+                    }
+                });
+            }
+            else if (state.step === 'ip_limit') {
+                userStates[chatId].tempServer.ip_limit = parseInt(text) || 1;
                 userStates[chatId].step = 'harga';
                 bot.sendMessage(chatId, '💰 Masukkan harga akun (contoh: 100000):', {
                     reply_markup: {
@@ -143,7 +154,7 @@ module.exports = (bot) => {
             const field = state.selectedField;
             
             // Update value
-            servers[serverIndex][field] = field === 'port' ? parseInt(newValue) || 22 : newValue;
+            servers[serverIndex][field] = field === 'port' || field === 'ip_limit' ? parseInt(newValue) || (field === 'port' ? 22 : 1) : newValue;
             
             // Save to file
             fs.writeFileSync('./servers.json', JSON.stringify(servers, null, 2));
@@ -194,6 +205,7 @@ module.exports = (bot) => {
             message += `   🔌 Port: ${server.port || '22'}\n`;
             message += `   👤 Username: ${server.username}\n`;
             message += `   🌍 Domain: ${server.domain || '-'}\n`;
+            message += `   🔢 IP Limit: ${server.ip_limit || '1'}\n`;
             message += `   💰 Harga: Rp ${server.harga || '0'}\n\n`;
         });
         
@@ -323,6 +335,9 @@ module.exports = (bot) => {
                     ],
                     [
                         { text: '🌍 Domain', callback_data: `edit_field_${index}_domain` },
+                        { text: '🔢 IP Limit', callback_data: `edit_field_${index}_ip_limit` }
+                    ],
+                    [
                         { text: '💰 Harga', callback_data: `edit_field_${index}_harga` }
                     ],
                     [
@@ -347,6 +362,7 @@ module.exports = (bot) => {
             port: 'port',
             username: 'username',
             domain: 'domain',
+            ip_limit: 'IP Limit',
             harga: 'harga'
         };
         

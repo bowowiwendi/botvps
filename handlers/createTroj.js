@@ -32,13 +32,13 @@ const updateAdminBalance = (adminId, amount) => {
     return false;
 };
 
-// Fungsi untuk menambahkan saldo ke admin utama
-const addToMainAdminBalance = (amount) => {
+// Fungsi untuk menambahkan saldo ke admin
+const addToAdminBalance = (adminId, amount) => {
     const admins = getAdmins();
-    const mainAdmin = admins.find(a => a.is_main);
+    const adminIndex = admins.findIndex(a => a.id === adminId);
     
-    if (mainAdmin) {
-        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+    if (adminIndex !== -1) {
+        admins[adminIndex].balance = (admins[adminIndex].balance || 0) + amount;
         fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
         return true;
     }
@@ -61,6 +61,7 @@ const sendReportToMainAdmin = async (bot, reportData) => {
 📛 *Username*: ${reportData.username}
 🔒 *Tipe*: Trojan
 💰 *Harga*: ${reportData.isMainAdmin ? 'GRATIS (Main Admin)' : 'Rp ' + reportData.price.toLocaleString()}
+🔢 *IP Limit*: ${reportData.ipLimit}
 📅 *Waktu*: ${new Date().toLocaleString()}
     `;
 
@@ -220,6 +221,7 @@ module.exports = (bot, servers) => {
             const domain = server.domain;
             const privateKeyPath = server.privateKey;
             const serverPrice = server.harga || 0;
+            const serverIpLimit = server.LimitIp || 2; // Ambil nilai IP Limit dari server.json, default 2
 
             // Dapatkan data admin
             const admins = getAdmins();
@@ -246,7 +248,7 @@ module.exports = (bot, servers) => {
             if (isMainAdmin) {
                 await bot.sendMessage(chatId, 'Masukkan detail Troj (format: username quota ip_limit masa_aktif):');
             } else {
-                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, IP: 2, Masa aktif: 30 hari)\nFormat: username');
+                await bot.sendMessage(chatId, 'Cukup Masukkan username (quota: 1000GB, IP: ' + serverIpLimit + ', Masa aktif: 30 hari)\nFormat: username');
             }
 
             const messageHandler = async (msg) => {
@@ -267,7 +269,7 @@ module.exports = (bot, servers) => {
                 } else {
                     username = msg.text.trim();
                     quota = '1000';
-                    ipLimit = '2';
+                    ipLimit = serverIpLimit.toString(); // Gunakan IP Limit dari server.json
                     activePeriod = '30';
                     
                     if (!username) {
@@ -295,8 +297,8 @@ module.exports = (bot, servers) => {
                     if (!isMainAdmin) {
                         // Kurangi saldo admin yang membuat
                         updateAdminBalance(admin.id, -serverPrice);
-                        // Tambahkan saldo ke admin utama
-                        addToMainAdminBalance(serverPrice);
+                        // Tambahkan saldo ke admin utama (jumlahkan dengan saldo yang ada)
+                        addToAdminBalance(admins.find(a => a.is_main).id, serverPrice);
                     }
 
                     // Kirim laporan ke admin utama
@@ -306,6 +308,7 @@ module.exports = (bot, servers) => {
                         serverName: server.name,
                         username: username,
                         price: serverPrice,
+                        ipLimit: ipLimit === '0' ? 'Unlimited' : ipLimit,
                         isMainAdmin: isMainAdmin
                     });
 

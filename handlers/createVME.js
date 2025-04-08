@@ -32,12 +32,12 @@ const updateAdminBalance = (adminId, amount) => {
     return false;
 };
  
-const addToMainAdminBalance = (amount) => {
+const addToAdminBalance = (adminId, amount) => {
     const admins = getAdmins();
-    const mainAdmin = admins.find(a => a.is_main);
+    const adminIndex = admins.findIndex(a => a.id === adminId);
     
-    if (mainAdmin) {
-        mainAdmin.balance = (mainAdmin.balance || 0) + amount;
+    if (adminIndex !== -1) {
+        admins[adminIndex].balance = (admins[adminIndex].balance || 0) + amount;
         fs.writeFileSync('./admins.json', JSON.stringify(admins, null, 2));
         return true;
     }
@@ -60,6 +60,7 @@ const sendReportToMainAdmin = async (bot, reportData) => {
 📛 *Username*: ${reportData.username}
 🔒 *Tipe*: VMESS
 💰 *Harga*: ${reportData.isMainAdmin ? 'GRATIS (Main Admin)' : 'Rp ' + reportData.price.toLocaleString()}
+🔢 *IP Limit*: ${reportData.ipLimit}
 📅 *Waktu*: ${new Date().toLocaleString()}
     `;
 
@@ -216,6 +217,7 @@ module.exports = (bot, servers) => {
             const domain = server.domain;
             const privateKeyPath = server.privateKey;
             const serverPrice = server.harga || 0;
+            const serverIpLimit = server.LimitIp || 2; // Ambil nilai IP Limit dari server.json, default 2
 
             // Dapatkan data admin
             const admins = getAdmins();
@@ -258,9 +260,9 @@ module.exports = (bot, servers) => {
                 }
 
                 // Set fixed values for non-main admins
-                const quota = isMainAdmin ? '0' : '1000';
-                const ipLimit = isMainAdmin ? '0' : '2';
-                const activePeriod = isMainAdmin ? '0' : '30';
+                const quota = isMainAdmin ? '1000' : '1000';
+                const ipLimit = isMainAdmin ? '2' : serverIpLimit.toString(); // Gunakan IP Limit dari server.json
+                const activePeriod = isMainAdmin ? '30' : '30';
 
                 try {
                     // Cek username
@@ -279,8 +281,8 @@ module.exports = (bot, servers) => {
                     if (!isMainAdmin) {
                         // Kurangi saldo admin yang membuat
                         updateAdminBalance(admin.id, -serverPrice);
-                        // Tambahkan saldo ke admin utama
-                        addToMainAdminBalance(serverPrice);
+                        // Tambahkan saldo ke admin utama (jumlahkan dengan saldo yang ada)
+                        addToAdminBalance(admins.find(a => a.is_main).id, serverPrice);
                     }
 
                     // Kirim laporan ke admin utama
@@ -290,6 +292,7 @@ module.exports = (bot, servers) => {
                         serverName: server.name,
                         username: username,
                         price: serverPrice,
+                        ipLimit: ipLimit === '0' ? 'Unlimited' : ipLimit,
                         isMainAdmin: isMainAdmin
                     });
 

@@ -22,9 +22,9 @@ module.exports = (bot) => {
                 [
                   { text: '📤 Backup Bot', callback_data: 'backup_menu' }
                 ],
-                [
-                  { text: '📥 Restore Bot', callback_data: 'upload_backup' }
-                ],
+                // [
+                //   { text: '📥 Restore Bot', callback_data: 'upload_backup' }
+                // ],
                 [
                   { text: '⚙️ Edit QR & Caption', callback_data: 'edit_topup_config' }
                 ],
@@ -42,7 +42,6 @@ di bawah untuk memilih perintah:
 - 👤 Manage Admin
 - 📢 Broadcast
 - 📤 Backup Bot
-- 📥 Restore Bot
 - 💳 QR/Payment
         `;
 

@@ -122,6 +122,7 @@ module.exports = (bot, servers) => {
                 const serverIndex = data.split('_')[2];
                 const server = servers[serverIndex];
                 const serverPrice = server.harga;
+                const serverLimitIp = server.limitIp || '2'; // Ambil dari servers.json, default 2 jika tidak ada
 
                 // Dapatkan data admin
                 const admins = getAdmins();
@@ -165,8 +166,8 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                     await bot.sendMessage(chatId, 
                         'Masukkan username renew (format: username):\n' +
                         `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
-                        'Default untuk admin biasa: 30 hari, 1000 GB, 2 IP\n' +
-                        'Contoh: username 30 1000 2');
+                        `Default untuk admin biasa: 30 hari, 1000 GB, ${serverLimitIp} IP\n` +
+                        'Contoh: username 30 1000');
                 }
 
                 // Tangkap input pengguna
@@ -180,11 +181,11 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         return;
                     }
 
-                    // Set default untuk admin biasa
+                    // Set default berdasarkan tipe admin
                     if (!isMainAdmin) {
                         exp = exp || '30';
                         quota = quota || '1000';
-                        limitIp = limitIp || '2';
+                        limitIp = serverLimitIp; // Ambil dari servers.json untuk admin biasa
                     } else {
                         // Admin utama bisa menentukan sendiri atau kosong untuk default
                         exp = exp || '30';
@@ -192,8 +193,8 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         limitIp = limitIp || '0'; // 0 biasanya berarti unlimited
                     }
 
-                    // Validasi input numerik
-                    if (isNaN(exp) || isNaN(quota) || isNaN(limitIp)) {
+                    // Validasi input numerik (kecuali limitIp untuk admin biasa)
+                    if (isNaN(exp) || isNaN(quota) || (isMainAdmin && isNaN(limitIp))) {
                         await bot.sendMessage(chatId, 'Masa aktif, quota, dan limit IP harus angka!');
                         return;
                     }

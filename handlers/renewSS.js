@@ -10,6 +10,7 @@ const getAdmins = () => {
     }
 };
 
+// Fungsi untuk menambahkan saldo ke admin utama
 const addToMainAdminBalance = (amount) => {
     const admins = getAdmins();
     const mainAdmin = admins.find(a => a.is_main);
@@ -122,6 +123,7 @@ module.exports = (bot, servers) => {
                 const serverIndex = data.split('_')[2];
                 const server = servers[serverIndex];
                 const serverPrice = server.harga;
+                const serverIpLimit = server.limitIp; // Ambil limit IP dari servers.json
 
                 // Dapatkan data admin
                 const admins = getAdmins();
@@ -163,10 +165,10 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         'Kosongkan field untuk menggunakan default (contoh: username saja)');
                 } else {
                     await bot.sendMessage(chatId, 
-                        'Masukkan username renew (format: username:\n' +
+                        'Masukkan username renew (format: username):\n' +
                         `Biaya: Rp ${serverPrice.toLocaleString()}\n` +
-                        'Default untuk user biasa: 30 hari, 1000 GB, 2 IP\n' +
-                        'Contoh: username 30 1000 2');
+                        `Default untuk user biasa: 30 hari, 1000 GB, ${serverIpLimit} IP\n` +
+                        'Contoh: username');
                 }
 
                 // Tangkap input pengguna
@@ -180,11 +182,11 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         return;
                     }
 
-                    // Set default untuk admin biasa
+                    // Set default berdasarkan peran admin
                     if (!isMainAdmin) {
                         exp = exp || '30';
                         quota = quota || '1000';
-                        limitIp = limitIp || '2';
+                        limitIp = serverIpLimit; // Gunakan limit IP dari servers.json untuk admin biasa
                     } else {
                         // Admin utama bisa menentukan sendiri atau kosong untuk default
                         exp = exp || '30';
@@ -192,9 +194,13 @@ Saldo Anda: Rp ${(admin.balance || 0).toLocaleString()}`);
                         limitIp = limitIp || '0'; // 0 biasanya berarti unlimited
                     }
 
-                    // Validasi input numerik
-                    if (isNaN(exp) || isNaN(quota) || isNaN(limitIp)) {
-                        await bot.sendMessage(chatId, 'Masa aktif, quota, dan limit IP harus angka!');
+                    // Validasi input numerik (hanya untuk admin utama jika mengisi limitIp)
+                    if (isMainAdmin && limitIp && isNaN(limitIp)) {
+                        await bot.sendMessage(chatId, 'Limit IP harus angka!');
+                        return;
+                    }
+                    if (isNaN(exp) || isNaN(quota)) {
+                        await bot.sendMessage(chatId, 'Masa aktif dan quota harus angka!');
                         return;
                     }
 

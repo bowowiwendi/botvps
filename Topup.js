@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
+// Inisialisasi userState jika belum ada
+if (!global.userState) {
+  global.userState = {};
+}
+
 // Default values
 let topupConfig = {
   qrImagePath: './Assets/topup.jpg',
@@ -37,9 +42,6 @@ module.exports = (bot) => {
           reply_markup: {
             inline_keyboard: [
               [{ text: '📤 Kirim Bukti Pembayaran', callback_data: 'send_payment_proof' }],
-              // ...(isAdmin ? [
-              //   [{ text: '⚙️ Edit QR & Caption (Admin)', callback_data: 'edit_topup_config' }]
-              // ] : []),
               [{ text: '🔙 Kembali', callback_data: 'list_servers' }]
             ]
           }
@@ -52,62 +54,63 @@ module.exports = (bot) => {
 
     if (data === 'send_payment_proof') {
       try {
-                // Minta user mengirim bukti pembayaran
-                const requestMsg = await bot.sendMessage(chatId, '📎 Silakan upload bukti pembayaran (foto/screenshot) dan kirim sebagai reply pesan ini.', {
-                    reply_markup: {
-                        force_reply: true
-                    }
-                });
+        const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
+        const mainAdmin = admins.find(admin => admin.is_main);
+        
+        if (!mainAdmin) {
+          await bot.sendMessage(chatId, '❌ Admin utama tidak ditemukan. Silakan hubungi developer.');
+          return;
+        }
 
-                // Membuat listener khusus untuk balasan ini
-                const replyListenerId = bot.onReplyToMessage(chatId, requestMsg.message_id, async (msg) => {
-                    // Hapus listener setelah digunakan untuk menghindari duplikasi
-                    bot.removeReplyListener(replyListenerId);
+        const requestMsg = await bot.sendMessage(chatId, '📎 Silakan upload bukti pembayaran (foto/screenshot) dan kirim sebagai reply pesan ini.', {
+          reply_markup: {
+            force_reply: true
+          }
+        });
 
-                    if (msg.photo || msg.document) {
-                        try {
-                            // Kirim notifikasi ke admin
-                            await bot.sendMessage(mainAdminId, `⚠️ **BUKTI PEMBAYARAN BARU**\n\n` +
-                                `👤 User: @${msg.from.username || 'N/A'}\n` +
-                                `🆔 ID: ${msg.from.id}\n` +
-                                `📅 Tanggal: ${new Date().toLocaleString()}\n\n` +
-                                `Silakan verifikasi pembayaran ini /topup.`);
+        const replyListenerId = bot.onReplyToMessage(chatId, requestMsg.message_id, async (msg) => {
+          bot.removeReplyListener(replyListenerId);
 
-                            // Forward media ke admin
-                            if (msg.photo) {
-                                // Ambil photo dengan kualitas tertinggi (elemen terakhir dalam array)
-                                await bot.sendPhoto(mainAdminId, msg.photo[msg.photo.length - 1].file_id);
-                            } else {
-                                await bot.sendDocument(mainAdminId, msg.document.file_id);
-                            }
+          if (msg.photo || msg.document) {
+            try {
+              // Kirim notifikasi ke admin utama
+              await bot.sendMessage(mainAdmin.id, `⚠️ **BUKTI PEMBAYARAN BARU**\n\n` +
+                `👤 User: @${msg.from.username || 'N/A'}\n` +
+                `🆔 ID: ${msg.from.id}\n` +
+                `📅 Tanggal: ${new Date().toLocaleString()}\n\n` +
+                `Silakan verifikasi pembayaran ini.`);
 
-                            // Konfirmasi ke user
-                            await bot.sendMessage(chatId, '✅ Bukti pembayaran telah diterima. Admin akan memproses dalam 1x24 jam.', {
-                                reply_markup: { remove_keyboard: true }
-                            });
+              // Forward media ke admin
+              if (msg.photo) {
+                await bot.sendPhoto(mainAdmin.id, msg.photo[msg.photo.length - 1].file_id);
+              } else {
+                await bot.sendDocument(mainAdmin.id, msg.document.file_id);
+              }
 
-                        } catch (error) {
-                            console.error('Error forwarding proof:', error);
-                            await bot.sendMessage(chatId, '❌ Gagal mengirim bukti. Silakan hubungi admin.');
-                        }
-                    } else {
-                        await bot.sendMessage(chatId, '❌ Format tidak valid. Harap kirim foto/screenshot bukti transfer.');
-                    }
-                });
-
-                // Set timeout untuk menghapus listener jika tidak ada respon dalam waktu tertentu
-                setTimeout(() => {
-                    bot.removeReplyListener(replyListenerId);
-                }, 60000); // 60 detik timeout
+              await bot.sendMessage(chatId, '✅ Bukti pembayaran telah diterima. Admin akan memproses dalam 1x24 jam.', {
+                reply_markup: { remove_keyboard: true }
+              });
 
             } catch (error) {
-                console.error('Error in payment proof flow:', error);
-                await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
+              console.error('Error forwarding proof:', error);
+              await bot.sendMessage(chatId, '❌ Gagal mengirim bukti. Silakan hubungi admin.');
             }
-        }
-    
+          } else {
+            await bot.sendMessage(chatId, '❌ Format tidak valid. Harap kirim foto/screenshot bukti transfer.');
+          }
+        });
 
-    if (data === 'edit_topup_config') {
+        setTimeout(() => {
+          bot.removeReplyListener(replyListenerId);
+        }, 60000); // 60 detik timeout
+
+      } catch (error) {
+        console.error('Error in payment proof flow:', error);
+        await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
+      }
+    }
+
+    if (data === 'edit_topup_config' && isAdmin) {
       const keyboard = {
         inline_keyboard: [
           [{ text: '🖼 Ganti QR Code', callback_data: 'change_qr_code' }],
@@ -122,7 +125,7 @@ module.exports = (bot) => {
       });
     }
 
-    if (data === 'change_qr_code') {
+    if (data === 'change_qr_code' && isAdmin) {
       await bot.sendMessage(chatId, '🖼 Silakan kirim gambar QR code baru:', {
         reply_markup: { force_reply: true }
       });
@@ -131,7 +134,7 @@ module.exports = (bot) => {
       userState[chatId] = { action: 'waiting_for_qr_update' };
     }
 
-    if (data === 'edit_topup_caption') {
+    if (data === 'edit_topup_caption' && isAdmin) {
       await bot.sendMessage(chatId, '✏️ Silakan kirim caption baru untuk topup:\n\n*Format Markdown didukung*', {
         parse_mode: 'Markdown',
         reply_markup: { force_reply: true }
@@ -142,7 +145,7 @@ module.exports = (bot) => {
     }
   });
 
-  // Handle photo update
+  // Handle photo update (untuk admin)
   bot.on('photo', async (msg) => {
     const chatId = msg.chat.id;
     const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
@@ -174,7 +177,7 @@ module.exports = (bot) => {
     }
   });
 
-  // Handle caption update
+  // Handle caption update (untuk admin)
   bot.on('text', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
@@ -209,8 +212,3 @@ module.exports = (bot) => {
     }
   });
 };
-
-// Inisialisasi userState jika belum ada
-if (!global.userState) {
-  global.userState = {};
-}

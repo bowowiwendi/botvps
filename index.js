@@ -6,7 +6,7 @@ require('dotenv').config();
 // Import commands and handlers
 const startCommand = require('./commands/start');
 const listCommand = require('./commands/list');
-// const addServerCommand = require('./commands/addserver');
+const genName = require('./commands/genName');
 // const delServerCommand = require('./commands/delserver');
 const v2rayCommand = require('./commands/v2ray');
 const createSSH = require('./handlers/createSSH');
@@ -97,7 +97,7 @@ const userState = {};
 const commands = [
     { command: startCommand, params: [bot] },
     { command: listCommand, params: [bot, servers] },
-  // { command: addServerCommand, params: [bot, userState, servers] },
+   { command: genName, params: [bot] },
   //   { command: delServerCommand, params: [bot, userState, servers] },
     { command: v2rayCommand, params: [bot, servers] },
     { command: createSSH, params: [bot, servers] },
