@@ -82,7 +82,7 @@ module.exports = (bot, servers) => {
                 }
 
                 const serverDescription = `
-👋 Hai, ${user.name} (@${ consolesuser.username})!
+👋 Hai, ${user.name} (@${user.username})!
 💰 Balance: Rp ${user.balance.toLocaleString()}
 
 📋 Keterangan Server:
