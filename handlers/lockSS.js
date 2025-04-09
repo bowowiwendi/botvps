@@ -1,5 +1,11 @@
 const { exec } = require('child_process');
 
+// Fungsi untuk sanitasi input username
+const sanitizeUsername = (username) => {
+    // Hanya izinkan karakter alfanumerik, underscore, dan tanda hubung
+    return username.replace(/[^a-zA-Z0-9_-]/g, '');
+};
+
 const viewSSMembers = async (vpsHost) => {
     return new Promise((resolve, reject) => {
         if (!vpsHost || typeof vpsHost !== 'string') {
@@ -11,13 +17,13 @@ const viewSSMembers = async (vpsHost) => {
 
         exec(command, (error, stdout, stderr) => {
             if (error || !stdout.trim()) {
-                reject('❌ Gagal mendapatkan daftar member');
+                reject(`❌ Gagal mendapatkan daftar member: ${stderr || 'Tidak ada data'}`);
                 return;
             }
 
             const formattedOutput = `📋 *DAFTAR MEMBER SHADOWSOCKS* 📋\n\n` +
                                   "```\n" +
-                                  stdout +
+                                  stdout.trim() +
                                   "\n```";
             resolve(formattedOutput);
         });
@@ -26,7 +32,8 @@ const viewSSMembers = async (vpsHost) => {
 
 const checkUsernameExists = (vpsHost, username) => {
     return new Promise((resolve, reject) => {
-        const command = `ssh root@${vpsHost} "grep -w '${username}' /etc/xray/config.json 2>/dev/null"`;
+        const sanitizedUsername = sanitizeUsername(username);
+        const command = `ssh root@${vpsHost} "grep -w '${sanitizedUsername}' /etc/xray/config.json 2>/dev/null"`;
         
         exec(command, (error, stdout) => {
             resolve(!error && stdout.trim() !== '');
@@ -36,13 +43,14 @@ const checkUsernameExists = (vpsHost, username) => {
 
 const lockSS = (vpsHost, username) => {
     return new Promise((resolve, reject) => {
-        const command = `ssh root@${vpsHost} "lock-ss '${username}'"`;
+        const sanitizedUsername = sanitizeUsername(username);
+        const command = `ssh root@${vpsHost} "lock-ss '${sanitizedUsername}'"`;
         
         exec(command, (error, stdout, stderr) => {
             if (error) {
                 reject(`❌ Gagal mengunci: ${stderr}`);
             } else {
-                resolve(`✅ User \`${username}\` berhasil dikunci`);
+                resolve(`✅ User \`${sanitizedUsername}\` berhasil dikunci`);
             }
         });
     });
@@ -67,10 +75,12 @@ module.exports = (bot, servers) => {
             try {
                 // Tampilkan daftar member terlebih dahulu
                 const listResult = await viewSSMembers(server.host);
-                await bot.sendMessage(chatId, listResult);
+                await bot.sendMessage(chatId, listResult, { parse_mode: 'Markdown' });
 
                 // Minta input username
-                await bot.sendMessage(chatId, '🔒 Masukkan username Shadowsocks yang ingin dikunci:');
+                await bot.sendMessage(chatId, '🔒 Masukkan username Shadowsocks yang ingin dikunci:', {
+                    parse_mode: 'Markdown'
+                });
 
                 // Tangkap input pengguna
                 bot.once('message', async (msg) => {
@@ -80,7 +90,8 @@ module.exports = (bot, servers) => {
                     
                     if (!username) {
                         await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
-                            reply_markup: backButton
+                            reply_markup: backButton,
+                            parse_mode: 'Markdown'
                         });
                         return;
                     }
@@ -90,7 +101,7 @@ module.exports = (bot, servers) => {
                         const exists = await checkUsernameExists(server.host, username);
                         if (!exists) {
                             await bot.sendMessage(chatId, 
-                                `❌ User \`${username}\` tidak ditemukan`, 
+                                `❌ User \`${sanitizeUsername(username)}\` tidak ditemukan`, 
                                 {
                                     parse_mode: 'Markdown',
                                     reply_markup: backButton
@@ -107,13 +118,15 @@ module.exports = (bot, servers) => {
                         });
                     } catch (error) {
                         await bot.sendMessage(chatId, error, {
-                            reply_markup: backButton
+                            reply_markup: backButton,
+                            parse_mode: 'Markdown'
                         });
                     }
                 });
             } catch (error) {
                 await bot.sendMessage(chatId, error, {
-                    reply_markup: backButton
+                    reply_markup: backButton,
+                    parse_mode: 'Markdown'
                 });
             }
         }

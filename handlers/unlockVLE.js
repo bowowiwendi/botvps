@@ -1,12 +1,18 @@
 const { exec } = require('child_process');
 
+// Fungsi untuk sanitasi input username
+const sanitizeUsername = (username) => {
+    // Hanya izinkan karakter alfanumerik dan beberapa karakter aman
+    return username.replace(/[^a-zA-Z0-9_-]/g, '');
+};
+
 // Fungsi untuk mendapatkan daftar akun yang terkunci
 const getLockedAccounts = (vpsHost, callback) => {
     const command = `ssh root@${vpsHost} "cat /etc/xray/.lock.db 2>/dev/null | grep '^#&' | cut -d ' ' -f 2-3 | sort | uniq | nl"`;
     
     exec(command, (error, stdout, stderr) => {
         if (error || !stdout.trim()) {
-            callback([]);
+            callback([], stderr || 'Tidak ada akun terkunci atau terjadi kesalahan');
         } else {
             callback(stdout.trim().split('\n'));
         }
@@ -15,7 +21,8 @@ const getLockedAccounts = (vpsHost, callback) => {
 
 // Fungsi untuk memeriksa apakah username terkunci
 const checkUserLocked = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "grep -w '${username}' /etc/xray/.lock.db 2>/dev/null"`;
+    const sanitizedUsername = sanitizeUsername(username);
+    const command = `ssh root@${vpsHost} "grep -w '${sanitizedUsername}' /etc/xray/.lock.db 2>/dev/null"`;
     
     exec(command, (error, stdout) => {
         callback(!error && stdout.trim() !== '');
@@ -24,13 +31,14 @@ const checkUserLocked = (vpsHost, username, callback) => {
 
 // Fungsi untuk membuka kunci akun VLESS
 const unlockVLE = (vpsHost, username, callback) => {
-    const command = `printf "${username}" | ssh root@${vpsHost} unlock-vl`;
+    const sanitizedUsername = sanitizeUsername(username);
+    const command = `printf "${sanitizedUsername}" | ssh root@${vpsHost} unlock-vl`;
     
     exec(command, (error, stdout, stderr) => {
         if (error) {
             callback(`❌ Gagal membuka kunci: ${stderr}`);
         } else {
-            callback(`✅ User \`${username}\` berhasil dibuka`);
+            callback(`✅ User \`${sanitizedUsername}\` berhasil dibuka`);
         }
     });
 };
@@ -51,22 +59,25 @@ module.exports = (bot, servers) => {
             };
 
             // Langkah 1: Tampilkan daftar akun terkunci terlebih dahulu
-            getLockedAccounts(server.host, async (accounts) => {
-                if (accounts.length === 0) {
-                    await bot.sendMessage(chatId, '🔓 Tidak ada akun VLESS yang terkunci', {
-                        reply_markup: backButton
+            getLockedAccounts(server.host, async (accounts, error) => {
+                if (error || accounts.length === 0) {
+                    await bot.sendMessage(chatId, error || '🔓 Tidak ada akun VLESS yang terkunci', {
+                        reply_markup: backButton,
+                        parse_mode: 'Markdown'
                     });
                     return;
                 }
 
                 // Kirim daftar akun terkunci sebagai pesan terpisah
                 await bot.sendMessage(chatId, 
-                    `📋 *Daftar Akun VLESS Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``
+                    `📋 *Daftar Akun VLESS Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``,
+                    { parse_mode: 'Markdown' }
                 );
 
                 // Langkah 2: Minta input username
                 await bot.sendMessage(chatId, 
-                    '🔓 Masukkan username VLESS yang ingin dibuka kuncinya:'
+                    '🔓 Masukkan username VLESS yang ingin dibuka kuncinya:',
+                    { parse_mode: 'Markdown' }
                 );
 
                 // Tangkap input pengguna
@@ -77,7 +88,8 @@ module.exports = (bot, servers) => {
                     
                     if (!username) {
                         await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
-                            reply_markup: backButton
+                            reply_markup: backButton,
+                            parse_mode: 'Markdown'
                         });
                         return;
                     }
@@ -86,7 +98,7 @@ module.exports = (bot, servers) => {
                     checkUserLocked(server.host, username, async (isLocked) => {
                         if (!isLocked) {
                             await bot.sendMessage(chatId, 
-                                `❌ User \`${username}\` tidak ditemukan dalam daftar terkunci`, 
+                                `❌ User \`${sanitizeUsername(username)}\` tidak ditemukan dalam daftar terkunci`, 
                                 { 
                                     parse_mode: 'Markdown',
                                     reply_markup: backButton 

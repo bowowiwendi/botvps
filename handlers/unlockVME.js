@@ -24,7 +24,7 @@ const checkUserLocked = (vpsHost, username, callback) => {
 
 // Fungsi untuk membuka kunci akun
 const unlockVME = (vpsHost, username, callback) => {
-    const command = `printf "${username}" | ssh root@${vpsHost} unlock-vm`;
+    const command = `printf "${username}" | ssh root@${vpsHost} "unlock-vm"`;
     
     exec(command, (error, stdout, stderr) => {
         if (error) {
@@ -61,12 +61,13 @@ module.exports = (bot, servers) => {
 
                 // Kirim daftar akun terkunci sebagai pesan terpisah
                 await bot.sendMessage(chatId, 
-                    `📋 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``
+                    `📋 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``,
+                    { parse_mode: 'Markdown' }
                 );
 
                 // Langkah 2: Minta input username
                 await bot.sendMessage(chatId, 
-                    '🔓 Masukkan username yang ingin dibuka kuncinya:'
+                    '🔓 Masukkan username yang ingin dibuka kuncinya:', { parse_mode: 'Markdown' }
                 );
 
                 // Tangkap input pengguna
@@ -76,7 +77,10 @@ module.exports = (bot, servers) => {
                     const username = msg.text.trim();
                     
                     if (!username) {
-                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong');     return;
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
+                            reply_markup: backButton
+                        });
+                        return;
                     }
 
                     // Langkah 3: Verifikasi akun terkunci

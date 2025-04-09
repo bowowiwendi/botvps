@@ -1,12 +1,18 @@
 const { exec } = require('child_process');
 
+// Fungsi untuk sanitasi input username
+const sanitizeUsername = (username) => {
+    // Hanya izinkan karakter alfanumerik, underscore, dan tanda hubung
+    return username.replace(/[^a-zA-Z0-9_-]/g, '');
+};
+
 // Function to check locked SSH users
 const getLockedSSHUsers = (vpsHost, callback) => {
     const command = `ssh root@${vpsHost} "cat /etc/shadow | grep '^[^:]*:!!' | cut -d: -f1 | nl"`;
     
     exec(command, (error, stdout, stderr) => {
         if (error || !stdout.trim()) {
-            callback([]);
+            callback([], stderr || 'Tidak ada user terkunci atau terjadi kesalahan');
         } else {
             callback(stdout.trim().split('\n'));
         }
@@ -15,25 +21,27 @@ const getLockedSSHUsers = (vpsHost, callback) => {
 
 // Function to unlock SSH user
 const unlockSSH = (vpsHost, username, callback) => {
+    const sanitizedUsername = sanitizeUsername(username);
+
     // First check if user exists and is locked
-    const checkCommand = `ssh root@${vpsHost} "grep '^${username}:' /etc/shadow | grep -q '!!' && echo 'locked' || echo 'not_locked'"`;
+    const checkCommand = `ssh root@${vpsHost} "grep '^${sanitizedUsername}:' /etc/shadow | grep -q '!!' && echo 'locked' || echo 'not_locked'"`;
     
     exec(checkCommand, (checkError, checkStdout, checkStderr) => {
         if (checkError) {
             return callback(`❌ Gagal memeriksa status user: ${checkStderr}`);
         }
         
-        if (checkStdout.includes('not_locked')) {
-            return callback(`❌ User \`${username}\` tidak terkunci.`);
+        if (checkStdout.trim() === 'not_locked') {
+            return callback(`❌ User \`${sanitizedUsername}\` tidak terkunci atau tidak ditemukan.`);
         }
         
         // If user is locked, proceed with unlocking
-        const unlockCommand = `ssh root@${vpsHost} "passwd -u ${username} && usermod -e '' ${username}"`;
+        const unlockCommand = `ssh root@${vpsHost} "passwd -u ${sanitizedUsername} && usermod -e '' ${sanitizedUsername}"`;
         exec(unlockCommand, (unlockError, unlockStdout, unlockStderr) => {
             if (unlockError) {
                 return callback(`❌ Gagal membuka kunci user: ${unlockStderr}`);
             }
-            callback(`✅ User \`${username}\` berhasil dibuka.`);
+            callback(`✅ User \`${sanitizedUsername}\` berhasil dibuka.`);
         });
     });
 };
@@ -54,22 +62,25 @@ module.exports = (bot, servers) => {
             };
 
             // Step 1: Show list of locked users
-            getLockedSSHUsers(server.host, async (lockedUsers) => {
-                if (lockedUsers.length === 0) {
-                    await bot.sendMessage(chatId, '🔓 Tidak ada user SSH yang terkunci', {
-                        reply_markup: backButton
+            getLockedSSHUsers(server.host, async (lockedUsers, error) => {
+                if (error || lockedUsers.length === 0) {
+                    await bot.sendMessage(chatId, error || '🔓 Tidak ada user SSH yang terkunci', {
+                        reply_markup: backButton,
+                        parse_mode: 'Markdown'
                     });
                     return;
                 }
 
                 // Send locked users list as separate message
                 await bot.sendMessage(chatId, 
-                    `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``
+                    `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``,
+                    { parse_mode: 'Markdown' }
                 );
 
                 // Step 2: Ask for username input
                 await bot.sendMessage(chatId, 
-                    '🔓 Masukkan username SSH yang ingin dibuka:'
+                    '🔓 Masukkan username SSH yang ingin dibuka:',
+                    { parse_mode: 'Markdown' }
                 );
 
                 // Step 3: Handle user input
@@ -80,7 +91,8 @@ module.exports = (bot, servers) => {
                     
                     if (!username) {
                         await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
-                            reply_markup: backButton
+                            reply_markup: backButton,
+                            parse_mode: 'Markdown'
                         });
                         return;
                     }

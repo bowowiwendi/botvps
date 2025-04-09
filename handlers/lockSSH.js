@@ -1,12 +1,18 @@
 const { exec } = require('child_process');
 
+// Fungsi untuk sanitasi input username
+const sanitizeUsername = (username) => {
+    // Hanya izinkan karakter alfanumerik, underscore, dan tanda hubung
+    return username.replace(/[^a-zA-Z0-9_-]/g, '');
+};
+
 // Fungsi untuk mengecek daftar user yang terkunci
 const getLockedSSHUsers = (vpsHost, callback) => {
     const command = `ssh root@${vpsHost} "cat /etc/shadow | grep '^[^:]*:!!' | cut -d: -f1 | nl 2>/dev/null"`;
     
     exec(command, (error, stdout, stderr) => {
         if (error || !stdout.trim()) {
-            callback([]);
+            callback([], stderr || 'Tidak ada user terkunci atau terjadi kesalahan');
         } else {
             callback(stdout.trim().split('\n'));
         }
@@ -15,11 +21,12 @@ const getLockedSSHUsers = (vpsHost, callback) => {
 
 // Fungsi untuk mengecek status user
 const checkUserStatus = (vpsHost, username, callback) => {
-    const command = `ssh root@${vpsHost} "grep '^${username}:' /etc/shadow | grep -q '!!' && echo 'locked' || echo 'unlocked'"`;
+    const sanitizedUsername = sanitizeUsername(username);
+    const command = `ssh root@${vpsHost} "grep '^${sanitizedUsername}:' /etc/shadow | grep -q '!!' && echo 'locked' || echo 'unlocked'"`;
     
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            callback('error');
+            callback('error', stderr || 'Gagal memeriksa status user');
         } else {
             callback(stdout.trim());
         }
@@ -29,13 +36,14 @@ const checkUserStatus = (vpsHost, username, callback) => {
 // Fungsi untuk mengunci SSH di VPS
 const lockSSH = (vpsHost, username) => {
     return new Promise((resolve, reject) => {
-        const command = `ssh root@${vpsHost} "passwd -l ${username} && usermod -e 1 ${username}"`;
+        const sanitizedUsername = sanitizeUsername(username);
+        const command = `ssh root@${vpsHost} "passwd -l ${sanitizedUsername} && usermod -e 1 ${sanitizedUsername}"`;
         
         exec(command, (error, stdout, stderr) => {
             if (error) {
                 reject(`❌ Gagal mengunci: ${stderr}`);
             } else {
-                resolve(`✅ User \`${username}\` berhasil dikunci`);
+                resolve(`✅ User \`${sanitizedUsername}\` berhasil dikunci`);
             }
         });
     });
@@ -59,53 +67,66 @@ module.exports = (bot, servers) => {
 
             try {
                 // Tampilkan daftar user terkunci terlebih dahulu
-                getLockedSSHUsers(server.host, async (lockedUsers) => {
-                    if (lockedUsers.length > 0) {
-                        await bot.sendMessage(chatId, 
-                            `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``
-                        );
+                await new Promise((resolve) => {
+                    getLockedSSHUsers(server.host, async (lockedUsers, error) => {
+                        if (error && lockedUsers.length === 0) {
+                            await bot.sendMessage(chatId, error, {
+                                reply_markup: backButton,
+                                parse_mode: 'Markdown'
+                            });
+                        } else if (lockedUsers.length > 0) {
+                            await bot.sendMessage(chatId, 
+                                `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``,
+                                { parse_mode: 'Markdown' }
+                            );
+                        }
+                        resolve();
+                    });
+                });
+
+                // Minta input username
+                await bot.sendMessage(chatId, '🔒 Masukkan username SSH yang ingin dikunci:', {
+                    parse_mode: 'Markdown'
+                });
+
+                // Tangkap input pengguna
+                bot.once('message', async (msg) => {
+                    if (msg.chat.id !== chatId) return;
+                    
+                    const username = msg.text.trim();
+                    
+                    if (!username) {
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
+                            reply_markup: backButton,
+                            parse_mode: 'Markdown'
+                        });
+                        return;
                     }
 
-                    // Minta input username
-                    await bot.sendMessage(chatId, '🔒 Masukkan username SSH yang ingin dikunci:'
-                    );
-
-                    // Tangkap input pengguna
-                    bot.once('message', async (msg) => {
-                        if (msg.chat.id !== chatId) return;
-                        
-                        const username = msg.text.trim();
-                        
-                        if (!username) {
-                            await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
-                                reply_markup: backButton
-                            });
-                            return;
-                        }
-
-                        try {
-                            // Verifikasi status user
-                            checkUserStatus(server.host, username, async (status) => {
+                    try {
+                        // Verifikasi status user
+                        await new Promise((resolve) => {
+                            checkUserStatus(server.host, username, async (status, errorMsg) => {
                                 if (status === 'error') {
                                     await bot.sendMessage(chatId, 
-                                        `❌ User \`${username}\` tidak ditemukan`, 
+                                        `❌ User \`${sanitizeUsername(username)}\` tidak ditemukan: ${errorMsg}`, 
                                         {
                                             parse_mode: 'Markdown',
                                             reply_markup: backButton
                                         }
                                     );
-                                    return;
+                                    return resolve();
                                 }
 
                                 if (status === 'locked') {
                                     await bot.sendMessage(chatId, 
-                                        `⚠️ User \`${username}\` sudah terkunci`, 
+                                        `⚠️ User \`${sanitizeUsername(username)}\` sudah terkunci`, 
                                         {
                                             parse_mode: 'Markdown',
                                             reply_markup: backButton
                                         }
                                     );
-                                    return;
+                                    return resolve();
                                 }
 
                                 // Proses mengunci
@@ -114,17 +135,20 @@ module.exports = (bot, servers) => {
                                     parse_mode: 'Markdown',
                                     reply_markup: backButton
                                 });
+                                resolve();
                             });
-                        } catch (error) {
-                            await bot.sendMessage(chatId, error, {
-                                reply_markup: backButton
-                            });
-                        }
-                    });
+                        });
+                    } catch (error) {
+                        await bot.sendMessage(chatId, error, {
+                            reply_markup: backButton,
+                            parse_mode: 'Markdown'
+                        });
+                    }
                 });
             } catch (error) {
-                await bot.sendMessage(chatId, '❌ Gagal memproses permintaan', {
-                    reply_markup: backButton
+                await bot.sendMessage(chatId, `❌ Gagal memproses permintaan: ${error}`, {
+                    reply_markup: backButton,
+                    parse_mode: 'Markdown'
                 });
             }
         }

@@ -148,14 +148,10 @@ const generateSSHMessage = (sshData) => {
 └─────────────────────
 ┌─────────────────────
 │ *Domain*   : \`${sshData.domain}\`
-│ *Port TLS* : 
-│ \`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
-│ *Port HTTP*: 
-│\`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
-│ *OpenSSH*  : 
-│\`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
-│ *UdpSSH*   : 
-│\`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
+│ *Port TLS* : \`443\`
+│ *Port HTTP*: \`80\`
+│ *OpenSSH*  : \`22\`
+│ *UdpSSH*   : \`1-65535\`
 │ *DNS*      : \`443, 53, 22\`
 │ *Dropbear* : \`443, 109\`
 │ *SSH WS*   : \`80\`
@@ -166,6 +162,10 @@ const generateSSHMessage = (sshData) => {
 │ *OVPN UDP* : \`2200\`
 │ *BadVPN UDP*: \`7100, 7300, 7300\`
 └─────────────────────
+\`${sshData.domain}:80@${sshData.username}:${sshData.password} \`
+\`${sshData.domain}:443@${sshData.username}:${sshData.password} \`
+\`${sshData.domain}:22@${sshData.username}:${sshData.password} \`
+\`${sshData.domain}:1-65535@${sshData.username}:${sshData.password} \`
 WSS Payload      : 
 \`\`\`
 GET wss://BUG.COM/ HTTP/1.1
@@ -178,7 +178,7 @@ Upgrade: websocket
 └─────────────────────
 OpenVPN Link     : [Download OpenVPN](https://${sshData.domain}:81/allovpn.zip)
 Save Account Link: [Save Account](https://${sshData.domain}:81/ssh-${sshData.username}.txt)
-  ✨ Selamat menggunakan layanan kami! ✨ `;
+✨ Selamat mencoba layanan kami! ✨`;
 };
 
 // Fungsi untuk membuat keyboard kembali
