@@ -64,19 +64,12 @@ module.exports = (bot, servers) => {
 
                 // Send locked users list as separate message
                 await bot.sendMessage(chatId, 
-                    `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``, 
-                    { 
-                        parse_mode: 'Markdown',
-                        reply_markup: backButton
-                    }
+                    `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``
                 );
 
                 // Step 2: Ask for username input
                 await bot.sendMessage(chatId, 
-                    '🔓 Masukkan username SSH yang ingin dibuka:',
-                    { 
-                        reply_markup: backButton
-                    }
+                    '🔓 Masukkan username SSH yang ingin dibuka:'
                 );
 
                 // Step 3: Handle user input

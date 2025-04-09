@@ -70,21 +70,14 @@ module.exports = (bot, servers) => {
             // Tampilkan daftar member terlebih dahulu
             viewVMEMembers(server.host, async (error, result) => {
                 if (error) {
-                    await bot.sendMessage(chatId, error, {
-                        reply_markup: backButton
-                    });
+                    await bot.sendMessage(chatId, error);
                     return;
                 }
 
-                await bot.sendMessage(chatId, result, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: backButton
-                });
+                await bot.sendMessage(chatId, result);
 
                 // Minta input username dari pengguna
-                await bot.sendMessage(chatId, 'Masukkan username VMESS yang ingin dikunci:', {
-                    reply_markup: backButton
-                });
+                await bot.sendMessage(chatId, 'Masukkan username VMESS yang ingin dikunci:');
 
                 // Gunakan ID unik untuk listener
                 const listenerId = `vme_lock_${chatId}_${Date.now()}`;

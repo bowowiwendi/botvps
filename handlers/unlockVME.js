@@ -61,19 +61,12 @@ module.exports = (bot, servers) => {
 
                 // Kirim daftar akun terkunci sebagai pesan terpisah
                 await bot.sendMessage(chatId, 
-                    `📋 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``, 
-                    { 
-                        parse_mode: 'Markdown',
-                        reply_markup: backButton
-                    }
+                    `📋 *Daftar Akun Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``
                 );
 
                 // Langkah 2: Minta input username
                 await bot.sendMessage(chatId, 
-                    '🔓 Masukkan username yang ingin dibuka kuncinya:',
-                    { 
-                        reply_markup: backButton
-                    }
+                    '🔓 Masukkan username yang ingin dibuka kuncinya:'
                 );
 
                 // Tangkap input pengguna
@@ -83,10 +76,7 @@ module.exports = (bot, servers) => {
                     const username = msg.text.trim();
                     
                     if (!username) {
-                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong', {
-                            reply_markup: backButton
-                        });
-                        return;
+                        await bot.sendMessage(chatId, '❌ Username tidak boleh kosong');     return;
                     }
 
                     // Langkah 3: Verifikasi akun terkunci

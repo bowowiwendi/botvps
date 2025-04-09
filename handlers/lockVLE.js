@@ -67,15 +67,10 @@ module.exports = (bot, servers) => {
             try {
                 // Tampilkan daftar member terlebih dahulu
                 const listResult = await viewVLEMembers(server.host);
-                await bot.sendMessage(chatId, listResult, {
-                    parse_mode: 'Markdown',
-                    reply_markup: backButton
-                });
+                await bot.sendMessage(chatId, listResult);
 
                 // Minta input username
-                await bot.sendMessage(chatId, '🔒 Masukkan username VLESS yang ingin dikunci:', {
-                    reply_markup: backButton
-                });
+                await bot.sendMessage(chatId, '🔒 Masukkan username VLESS yang ingin dikunci:');
 
                 // Tangkap input pengguna
                 bot.once('message', async (msg) => {

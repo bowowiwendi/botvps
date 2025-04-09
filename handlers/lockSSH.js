@@ -62,18 +62,13 @@ module.exports = (bot, servers) => {
                 getLockedSSHUsers(server.host, async (lockedUsers) => {
                     if (lockedUsers.length > 0) {
                         await bot.sendMessage(chatId, 
-                            `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``, 
-                            { 
-                                parse_mode: 'Markdown',
-                                reply_markup: backButton
-                            }
+                            `📋 *Daftar User SSH Terkunci:*\n\n\`\`\`\n${lockedUsers.join('\n')}\n\`\`\``
                         );
                     }
 
                     // Minta input username
-                    await bot.sendMessage(chatId, '🔒 Masukkan username SSH yang ingin dikunci:', {
-                        reply_markup: backButton
-                    });
+                    await bot.sendMessage(chatId, '🔒 Masukkan username SSH yang ingin dikunci:'
+                    );
 
                     // Tangkap input pengguna
                     bot.once('message', async (msg) => {

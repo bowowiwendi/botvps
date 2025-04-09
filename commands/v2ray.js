@@ -73,12 +73,12 @@ module.exports = (bot, servers) => {
 
         try {
             if (data.startsWith('v2ray_')) {
-                const serverIndex = data.split('_')[1];
+                const serverIndex = parseInt(data.split('_')[1], 10); // Pastikan serverIndex adalah angka
                 const server = servers[serverIndex];
 
-                if (!server) {
-                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan atau index salah.');
-                    return;
+                if (!server || serverIndex >= servers.length || serverIndex < 0) {
+                    console.error(`Server tidak ditemukan untuk index: ${serverIndex}`);
+                    return; // Hanya log di terminal, tidak kirim pesan ke user
                 }
 
                 const serverDescription = `
@@ -110,8 +110,7 @@ by @WENDIVPN`;
                 }
             }
         } catch (error) {
-            console.error('Terjadi kesalahan:', error);
-            // Tidak mengirim pesan apapun untuk error umum
+            console.error('Terjadi kesalahan di handler v2ray:', error);
         }
     });
 
@@ -124,11 +123,12 @@ by @WENDIVPN`;
         try {
             if (data.startsWith('vme_') || data.startsWith('vle_') || data.startsWith('troj_') || data.startsWith('ss_')) {
                 const [prefix, serverIndex] = data.split('_');
-                const server = servers[serverIndex];
+                const serverIdx = parseInt(serverIndex, 10); // Konversi ke integer
+                const server = servers[serverIdx];
 
-                if (!server) {
-                    await bot.sendMessage(chatId, '❌ Server tidak ditemukan atau index salah.');
-                    return;
+                if (!server || serverIdx >= servers.length || serverIdx < 0) {
+                    console.error(`Server tidak ditemukan untuk index: ${serverIdx}`);
+                    return; // Hanya log di terminal, tidak kirim pesan ke user
                 }
                 
                 const serverDescription = `
@@ -142,12 +142,11 @@ by @WENDIVPN`;
 
 by @WENDIVPN`;
 
-                const subMenu = createSubMenu(prefix, serverIndex, user.is_main);
+                const subMenu = createSubMenu(prefix, serverIdx, user.is_main);
                 await bot.sendMessage(chatId, serverDescription, { reply_markup: subMenu });
             }
         } catch (error) {
-            console.error('Terjadi kesalahan:', error);
-            // Tidak mengirim pesan apapun untuk error umum
+            console.error('Terjadi kesalahan di handler submenu:', error);
         }
     });
 };

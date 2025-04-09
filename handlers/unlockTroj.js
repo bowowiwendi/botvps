@@ -61,19 +61,12 @@ module.exports = (bot, servers) => {
 
                 // Kirim daftar akun terkunci sebagai pesan terpisah
                 await bot.sendMessage(chatId, 
-                    `📋 *Daftar Akun Trojan Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``, 
-                    { 
-                        parse_mode: 'Markdown',
-                        reply_markup: backButton
-                    }
+                    `📋 *Daftar Akun Trojan Terkunci:*\n\n\`\`\`\n${accounts.join('\n')}\n\`\`\``
                 );
 
                 // Langkah 2: Minta input username
                 await bot.sendMessage(chatId, 
-                    '🔓 Masukkan username Trojan yang ingin dibuka kuncinya:',
-                    { 
-                        reply_markup: backButton
-                    }
+                    '🔓 Masukkan username Trojan yang ingin dibuka kuncinya:'
                 );
 
                 // Tangkap input pengguna
