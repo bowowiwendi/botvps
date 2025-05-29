@@ -47,8 +47,8 @@ module.exports = (bot, servers) => {
                     [{ text: 'List', callback_data: `${prefix}_list_${serverIndex}` }],
                     [{ text: 'Renew', callback_data: `${prefix}_renew_${serverIndex}` }],
                     [{ text: 'Detail', callback_data: `${prefix}_detail_${serverIndex}` }],
-                    [{ text: 'Unlock', callback_data: `${prefix}_unlock_${serverIndex}` }],
                     [{ text: 'Lock', callback_data: `${prefix}_lock_${serverIndex}` }],
+                    [{ text: 'Unlock', callback_data: `${prefix}_unlock_${serverIndex}` }],
                     [{ text: '🔙 Kembali', callback_data: `v2ray_${serverIndex}` }],
                 ],
             };

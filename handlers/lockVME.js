@@ -46,7 +46,7 @@ const checkUsernameExists = (vpsHost, username, callback) => {
 // Fungsi untuk mengunci akun VMESS di VPS
 const lockVME = (vpsHost, username, callback) => {
     const sanitizedUsername = sanitizeUsername(username);
-    const command = `ssh root@${vpsHost} "lock-vm '${sanitizedUsername}'"`;
+    const command = `printf "${sanitizedUsername}" | ssh root@${vpsHost} "lock-vm"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {

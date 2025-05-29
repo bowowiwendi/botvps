@@ -44,7 +44,7 @@ const checkUsernameExists = (vpsHost, username) => {
 const lockSS = (vpsHost, username) => {
     return new Promise((resolve, reject) => {
         const sanitizedUsername = sanitizeUsername(username);
-        const command = `ssh root@${vpsHost} "lock-ss '${sanitizedUsername}'"`;
+        const command = `printf "${sanitizedUsername}" | ssh root@${vpsHost} "lock-ss"`;
         
         exec(command, (error, stdout, stderr) => {
             if (error) {

@@ -44,7 +44,7 @@ const checkUsernameExists = (vpsHost, username) => {
 const lockVLE = (vpsHost, username) => {
     return new Promise((resolve, reject) => {
         const sanitizedUsername = sanitizeUsername(username);
-        const command = `ssh root@${vpsHost} "lock-vl '${sanitizedUsername}'"`;
+        const command = `printf "${sanitizedUsername}" | ssh root@${vpsHost} "lock-vl"`;
         
         exec(command, (error, stdout, stderr) => {
             if (error) {
@@ -75,9 +75,10 @@ module.exports = (bot, servers) => {
             try {
                 // Tampilkan daftar member terlebih dahulu
                 const listResult = await viewVLEMembers(server.host);
+                // Kirim pesan daftar anggota dan tunggu hingga selesai
                 await bot.sendMessage(chatId, listResult, { parse_mode: 'Markdown' });
 
-                // Minta input username
+                // Setelah daftar anggota dikirim, minta input username
                 await bot.sendMessage(chatId, '🔒 Masukkan username VLESS yang ingin dikunci:', {
                     parse_mode: 'Markdown'
                 });
